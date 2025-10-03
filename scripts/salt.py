@@ -1,6 +1,7 @@
 import maya.cmds as cmds
 
 # commandPort -n "localhost:7001" -stp "mel" -echoOutput;
+# https://help.autodesk.com/cloudhelp/ENU/MayaCRE-Tech-Docs/CommandsPython/
 
 def separateComponentString(componentString, groups = [1]):
     """
@@ -28,45 +29,50 @@ def separateComponentString(componentString, groups = [1]):
             
             matchRange = re.match(r'(\d+):(\d+)', match.group(3))
             if (not matchRange):
-                group = int(match.group(3))
+                group = [int(match.group(3))]
                 separated += [group]
                 continue
             rangeStart = int(matchRange.group(1))
             rangeEnd = int(matchRange.group(2)) + 1
 
             group = list(range(rangeStart, rangeEnd))
-            separated += group
+            separated += [group]
     else:
         separated = [""]
     
     return separated
 
-# selected = cmds.ls(selection = True)
-# if (selected == [""]):
-#     print("nothing selected")
+def facesToEdgePerimeter():
+    selected = cmds.ls(selection = True)
 
-# internalEdges = cmds.polyListComponentConversion(selected, fromFace = True, toEdge = True, internal = True)
-# components = separateComponentString(internalEdges[0], [1, 2])
-# print(internalEdges)
+    for item in selected:
+        if (separateComponentString(item, [2])[0] == "f"):
+            break
+    else:
+        print("No faces selected!")
+        return
 
-# internalEdgeIndices = []
-# for edge in internalEdges:
-#     internalEdgeIndices += separateComponentString(edge, [3])
-# print(internalEdgeIndices)
+    internalEdges = cmds.polyListComponentConversion(selected, fromFace = True, toEdge = True, internal = True)
+    components = separateComponentString(internalEdges[0], [1, 2])
 
-# allEdges = cmds.polyListComponentConversion(selected, fromFace = True, toEdge = True, internal = False)
+    internalEdgeIndices = []
+    for edge in internalEdges:
+        internalEdgeIndices += separateComponentString(edge, [3])[0]
+    print(internalEdgeIndices)
 
-# externalEdges = []
-# for edge in allEdges:
+    allEdges = cmds.polyListComponentConversion(selected, fromFace = True, toEdge = True, internal = False)
 
-#     index = separateComponentString(edge, [3])
-#     print(index)
-    
-#     for i in index:
-#         if (internalEdgeIndices.__contains__(index)):
-#             continue
-#         externalEdges += [f"{components[0]}.{components[1]}[{i}]"]
+    externalEdges = []
+    for edge in allEdges:
 
-# cmds.select(clear = True)
-# print(externalEdges)
-# cmds.select(externalEdges)
+        indices = separateComponentString(edge, [3])[0]
+        
+        for index in indices:
+            if (internalEdgeIndices.__contains__(index)):
+                continue
+            externalEdges += [f"{components[0]}.{components[1]}[{index}]"]
+
+    cmds.select(clear = True)
+    cmds.select(externalEdges)
+
+facesToEdgePerimeter()
