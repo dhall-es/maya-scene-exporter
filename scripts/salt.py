@@ -43,24 +43,36 @@ def separateComponentString(componentString, groups = [1]):
     return separated
 
 def facesToEdgePerimeter():
-    selected = cmds.ls(selection = True)
+    objectsSelected = cmds.ls(selection = True, objectsOnly = True, an = True)
 
-    for item in selected:
+    if len(objectsSelected) <= 0:
+        print("No objects selected.")
+        return
+    elif len(objectsSelected) > 1:
+        print("More than 1 object selected.")
+        return
+
+    allSelected = cmds.ls(selection = True)
+    objectName = separateComponentString(allSelected[0], [1])[0]
+
+    for item in allSelected:
         if (separateComponentString(item, [2])[0] == "f"):
             break
     else:
-        print("No faces selected!")
+        print("No faces selected.")
         return
 
-    internalEdges = cmds.polyListComponentConversion(selected, fromFace = True, toEdge = True, internal = True)
-    components = separateComponentString(internalEdges[0], [1, 2])
-
+    internalEdges = cmds.polyListComponentConversion(allSelected, fromFace = True, toEdge = True, internal = True)
     internalEdgeIndices = []
-    for edge in internalEdges:
-        internalEdgeIndices += separateComponentString(edge, [3])[0]
-    print(internalEdgeIndices)
 
-    allEdges = cmds.polyListComponentConversion(selected, fromFace = True, toEdge = True, internal = False)
+    if len(internalEdges) <= 0:
+        pass    
+    else:
+
+        for edge in internalEdges:
+            internalEdgeIndices += separateComponentString(edge, [3])[0]
+
+    allEdges = cmds.polyListComponentConversion(allSelected, fromFace = True, toEdge = True, internal = False)
 
     externalEdges = []
     for edge in allEdges:
@@ -70,7 +82,7 @@ def facesToEdgePerimeter():
         for index in indices:
             if (internalEdgeIndices.__contains__(index)):
                 continue
-            externalEdges += [f"{components[0]}.{components[1]}[{index}]"]
+            externalEdges += [f"{objectName}.e[{index}]"]
 
     cmds.select(clear = True)
     cmds.select(externalEdges)
