@@ -3,7 +3,7 @@ import maya.cmds as cmds
 windowName = "beefWindow"
 
 exportsList = []
-listLayout = ""
+exportsListLayout = ""
 
 def getModifiers():
     output = []
@@ -31,9 +31,9 @@ class exportItem:
         # Scrollable list of objects included
         self.includedObjects = includedObjects
 
-        self.listLayout = cmds.scrollLayout(parent = self, childResizable = True, bgc = bgColor(-0.09))
+        self.scrollLayout = cmds.scrollLayout(parent = self, childResizable = True, bgc = bgColor(-0.09))
         for item in includedObjects:
-            cmds.text(item, parent = self.listLayout, align = 'left')
+            cmds.text(item, parent = self.scrollLayout, align = 'left')
 
         # Select object(s) button
         self.selectButton = cmds.button(parent = self, w = 100, h = 30,
@@ -48,14 +48,14 @@ class exportItem:
 
         # Set up layout
         cmds.formLayout(self, edit = True, 
-                        attachForm = [(self.listLayout, 'left', 4),
-                                      (self.listLayout, 'top', 4),
-                                      (self.listLayout, 'bottom', 4),
+                        attachForm = [(self.scrollLayout, 'left', 4),
+                                      (self.scrollLayout, 'top', 4),
+                                      (self.scrollLayout, 'bottom', 4),
                                       (self.textField, 'top', 4),
                                       (self.textField, 'right', 4),
                                       (self.selectButton, 'top', 4),
                                       (self.removeButton, 'bottom', 4)],
-                        attachPosition = [(self.listLayout, 'right', 2, 40),
+                        attachPosition = [(self.scrollLayout, 'right', 2, 40),
                                           (self.selectButton, 'left', 2, 40),
                                           (self.removeButton, 'left', 2, 40),
                                           (self.selectButton, 'bottom', 2, 50),
@@ -81,7 +81,40 @@ class exportItem:
     def removeThis(self):
         cmds.deleteUI(self, layout = True)
         exportsList.remove(self)
+        exportsListLayout.controls.remove(self)
+        exportsListLayout.updateLayout()
 
+    def __str__(self):
+        return self.name
+
+class quickFormLayout:
+    def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27]):
+        self.name = cmds.formLayout(parent = parent,
+                                    enableBackground = ebg,
+                                    backgroundColor = bgc,
+                                    numberOfDivisions = 100)
+        
+        self.controls = []
+    
+    def updateLayout(self, horizontalOffset = 4, verticalOffset = 4):
+        if (len(self.controls) <= 0):
+            return
+        
+        attachForm = []
+        attachForm += [(self.controls[0], 'top', verticalOffset)]
+
+        for control in self.controls:
+            attachForm += [(control, 'left', horizontalOffset)]
+            attachForm += [(control, 'right', horizontalOffset)]
+        
+        attachControl = []
+        for i in range(1, len(self.controls)):
+            attachControl += [(self.controls[i], 'top', verticalOffset, self.controls[i - 1])]
+        
+        cmds.formLayout(self.name, edit = True,
+                        attachForm = attachForm,
+                        attachControl = attachControl)
+    
     def __str__(self):
         return self.name
 
@@ -91,8 +124,12 @@ def bgColor(offset = 0):
 def addSelected(*args):
     selected = cmds.ls(selection = True)
 
+    item = exportItem(exportsListLayout, selected)
+    
     global exportsList
-    exportsList += [exportItem(listLayout, selected)]
+    exportsList += [item]
+    exportsListLayout.controls += [item]
+    exportsListLayout.updateLayout()
 
 def createWindow():
     if (cmds.window(windowName, exists = True)):
@@ -112,14 +149,15 @@ def createWindow():
                     attachPosition = [(addButton, 'right', 5, 40)])
 
     # Scroll layout w/ list
-    global listLayout
-    listLayout = cmds.scrollLayout(parent = coreLayout, childResizable = True, bgc = bgColor(-0.06))
+    global exportsListLayout
+    scrollLayout = cmds.scrollLayout(parent = coreLayout, childResizable = True, bgc = bgColor(-0.06))
+    exportsListLayout = quickFormLayout(scrollLayout, False)
 
     cmds.formLayout(coreLayout, edit = True, 
-                    attachForm = [(listLayout, 'right', 5),
-                                  (listLayout, 'top', 5),
-                                  (listLayout, 'bottom', 5)],
-                    attachPosition = [(listLayout, 'left', 0, 40)])
+                    attachForm = [(scrollLayout, 'right', 5),
+                                  (scrollLayout, 'top', 5),
+                                  (scrollLayout, 'bottom', 5)],
+                    attachPosition = [(scrollLayout, 'left', 0, 40)])
 
     # Show Window
     cmds.showWindow(windowName)
