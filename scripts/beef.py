@@ -3,9 +3,6 @@ import maya.cmds as cmds
 windowName = "beefWindow"
 
 exportsList = []
-# exportsListLayout = ""
-
-# exportsCountLabel = ""
 
 def getModifiers():
     output = []
@@ -172,10 +169,15 @@ def export(*args):
     
     for item in exportsList:
         item.selectThis()
+        if (item.filename == ""):
+            print("Skipped export due to empty filename")
+            continue
+
         directory = f"{dirField.directory}/{item.filename}.fbx"
         print(f"exporting {item.filename} to {directory}")
-        cmds.file(directory, exportSelected = True, force = True, type = "FBX export",
-                  preserveReferences = True, options="v=0;")
+
+        # -s makes it export selected instead of export all
+        cmds.FBXExport("-file", directory, "-s")
 
 def addSelectedSeparate(*args):
     selected = cmds.ls(selection = True)
