@@ -200,21 +200,31 @@ def createExportsTab(coreLayout):
                     
     return exportsTab
 
+def createBeefUI():
+    coreLayout = cmds.paneLayout(configuration = 'vertical2')
+
+    settingsTab = createSettingsTab(coreLayout)
+    exportsTab = createExportsTab(coreLayout)
+
 def createWindow():
+    """
+    Backup function for creating the window. Ideally you would use workspaceControl since it docks to the UI,
+    but sometimes they can be a little finnicky.
+    """
     if (cmds.window(windowName, exists = True)):
         cmds.deleteUI(windowName, window = True)
 
     window = cmds.window(windowName, title = "Beef Window", widthHeight = (500, 600), resizeToFitChildren = True)
-
-    coreLayout = cmds.tabLayout(parent = window, enableBackground = False, w = 300, h = 200)
-
-    exportsTab = createExportsTab(coreLayout)
-    settingsTab = createSettingsTab(coreLayout)
-    
-
-    cmds.tabLayout(coreLayout, edit = True, tabLabel = ((exportsTab, 'List of exports'), (settingsTab, 'Settings')))
-
-    # Show Window
+    createBeefUI(window)
     cmds.showWindow(windowName)
 
-createWindow()
+
+
+def createWorkspaceControl(windowName):
+    if (cmds.workspaceControl(windowName, exists = True)):
+            cmds.workspaceControl(windowName, edit=True, l = "Exporter", uiScript = "createBeefUI()")
+            cmds.workspaceControl(windowName, edit=True, close = True)
+
+    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "createBeefUI()")
+
+createWorkspaceControl(windowName)
