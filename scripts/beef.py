@@ -5,6 +5,8 @@ windowName = "beefWindow"
 exportsList = []
 exportsListLayout = ""
 
+exportsCountLabel = ""
+
 def getModifiers():
     output = []
     mods = cmds.getModifiers()
@@ -31,7 +33,7 @@ class exportItem:
         # Scrollable list of objects included
         self.includedObjects = includedObjects
 
-        self.scrollLayout = cmds.scrollLayout(parent = self, childResizable = True, bgc = bgColor(-0.09),
+        self.scrollLayout = cmds.scrollLayout(parent = self, childResizable = True, bgc = bgColor(-0.12),
                                               annotation = "Objects included in this export")
         for item in includedObjects:
             cmds.text(item, parent = self.scrollLayout, align = 'left')
@@ -48,7 +50,7 @@ class exportItem:
         
         # Filename text field
         self.textField = cmds.textField(parent = self, text = includedObjects[0], placeholderText = "filename",
-                                        annotation = "filename")
+                                        annotation = "filename", w = 150, bgc = bgColor(-0.12))
 
         # Set up layout
         cmds.formLayout(self, edit = True, 
@@ -59,14 +61,11 @@ class exportItem:
                                       (self.textField, 'left', 4),
                                       (self.selectButton, 'top', 4),
                                       (self.removeButton, 'bottom', 4)],
-                        attachPosition = [(self.textField, 'right', 2, 30),
-                                          (self.selectButton, 'left', 2, 30),
-                                          (self.removeButton, 'left', 2, 30),
-                                          (self.selectButton, 'bottom', 2, 50),
-                                          (self.removeButton, 'top', 2, 50),
-                                          (self.selectButton, 'right', 2, 60),
-                                          (self.removeButton, 'right', 2, 60),
-                                          (self.scrollLayout, 'left', 2, 60)])
+                        attachControl = [(self.selectButton, 'left', 4, self.textField),
+                                         (self.removeButton, 'left', 4, self.textField),
+                                         (self.scrollLayout, 'left', 4, self.selectButton)],
+                        attachPosition = [(self.selectButton, 'bottom', 2, 50),
+                                          (self.removeButton, 'top', 2, 50)])
     
     def selectThis(self):
         mods = getModifiers()
@@ -84,9 +83,14 @@ class exportItem:
 
     def removeThis(self):
         cmds.deleteUI(self, layout = True)
+
+        global exportsList
         exportsList.remove(self)
         exportsListLayout.controls.remove(self)
         exportsListLayout.updateLayout()
+
+        global exportsCountLabel
+        cmds.text(exportsCountLabel, edit = True, label = f"Ready to export ({len(exportsList)}) files")
 
     def __str__(self):
         return self.name
@@ -142,8 +146,10 @@ class directoryField:
                         attachControl = [(self.field, 'left', 2, self.label), (self.field, 'right', 2, self.button)])
         
     def browseDir(self):
-        self.directory = cmds.fileDialog2(fileMode = 3)[0]
-        cmds.textField(self.field, edit = True, text = self.directory)
+        directory = cmds.fileDialog2(fileMode = 3)
+        if (directory):
+            self.directory = directory[0]
+            cmds.textField(self.field, edit = True, text = self.directory)
         
     def __str__(self):
         return self.name
@@ -151,7 +157,26 @@ class directoryField:
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 
-def addSelected(*args):
+def addSelectedSeparate(*args):
+    selected = cmds.ls(selection = True)
+    print(selected)
+    if (len(selected) <= 0):
+        print("No objects selected.")
+        return
+
+    for obj in selected:
+        item = exportItem(exportsListLayout, [obj])
+    
+        global exportsList
+        exportsList += [item]
+        exportsListLayout.controls += [item]
+    
+    exportsListLayout.updateLayout()
+
+    global exportsCountLabel
+    cmds.text(exportsCountLabel, edit = True, label = f"Ready to export ({len(exportsList)}) files")
+
+def addSelectedSingle(*args):
     selected = cmds.ls(selection = True)
     if (len(selected) <= 0):
         print("No objects selected.")
@@ -164,18 +189,11 @@ def addSelected(*args):
     exportsListLayout.controls += [item]
     exportsListLayout.updateLayout()
 
-
+    global exportsCountLabel
+    cmds.text(exportsCountLabel, edit = True, label = f"Ready to export ({len(exportsList)}) files")
 
 def createSettingsPane(coreLayout):
     settingsPane = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
-
-    # "Add Selected" Button
-    addButton = cmds.button(parent = settingsPane, w = 50, h = 30, 
-                            label = "Add Selection", annotation = "Adds selected objects as a new list element",
-                            command = addSelected)
-    
-    cmds.formLayout(settingsPane, edit = True,
-                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5), (addButton, 'right', 0)])
 
     # File directory field
     dirField = directoryField(parent = settingsPane)
@@ -188,6 +206,26 @@ def createSettingsPane(coreLayout):
 def createExportsPane(coreLayout):
     exportsPane = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
 
+    # Exports count label
+    global exportsCountLabel
+    exportsCountLabel = cmds.text(parent = exportsPane, align = 'left', label = f"Ready to export ({len(exportsList)}) files")
+    
+    cmds.formLayout(exportsPane, edit = True, attachForm = [(exportsCountLabel, 'top', 55), (exportsCountLabel, 'left', 5)])    
+
+    # "Add Selected (single)" Button
+    addSingleButton = cmds.button(parent = exportsPane, w = 150, h = 30, command = addSelectedSingle,
+                            label = "Add Selection (single)", annotation = "Adds selected objects to be exported as one file")
+    
+    cmds.formLayout(exportsPane, edit = True,
+                    attachForm = [(addSingleButton, 'top', 5), (addSingleButton, 'right', 5)])
+    
+    # "Add Selected (separate)" Button
+    addSeparateButton = cmds.button(parent = exportsPane, w = 150, h = 30, command = addSelectedSeparate,
+                            label = "Add Selection (separate)", annotation = "Adds selected objects to be exported as multiple files")
+    
+    cmds.formLayout(exportsPane, edit = True, attachForm = [(addSeparateButton, 'right', 5)],
+                    attachControl = [(addSeparateButton, 'top', 5, addSingleButton)])
+    
     # Scroll area and list of exports
     scrollLayout = cmds.scrollLayout(parent = exportsPane, childResizable = True, bgc = bgColor(-0.06))
 
@@ -195,7 +233,8 @@ def createExportsPane(coreLayout):
     exportsListLayout = quickFormLayout(scrollLayout, False)
 
     cmds.formLayout(exportsPane, edit = True,
-                    attachForm = [(scrollLayout, 'left', 0), (scrollLayout, 'right', 5), (scrollLayout, 'bottom', 5), (scrollLayout, 'top', 5)])
+                    attachForm = [(scrollLayout, 'left', 0), (scrollLayout, 'right', 5), (scrollLayout, 'bottom', 5)],
+                    attachControl = [(scrollLayout, 'top', 5, addSeparateButton)])
                     
     return exportsPane
 
@@ -221,9 +260,9 @@ def createWindow():
 
 def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
-            cmds.workspaceControl(windowName, edit=True, l = "Exporter", uiScript = "createBeefUI()")
             cmds.workspaceControl(windowName, edit=True, close = True)
 
-    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "createBeefUI()")
+    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "createBeefUI()",
+                          mw = 500, mh = 600, label = "Exporter")
 
 createWorkspaceControl(windowName)
