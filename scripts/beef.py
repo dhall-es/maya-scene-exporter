@@ -3,9 +3,9 @@ import maya.cmds as cmds
 windowName = "beefWindow"
 
 exportsList = []
-exportsListLayout = ""
+# exportsListLayout = ""
 
-exportsCountLabel = ""
+# exportsCountLabel = ""
 
 def getModifiers():
     output = []
@@ -41,7 +41,7 @@ class exportItem:
         # Select object(s) button
         self.selectButton = cmds.button(parent = self, w = 100, h = 30,
                                         label = "Select object(s)", annotation = "Selects objects included in this export. Works with Shift/Ctrl",
-                                        bgc = bgColor(0.09), command = lambda _: self.selectThis())
+                                        bgc = bgColor(0.09), command = lambda _: self.selectThis(True))
         
         # Remove from list button
         self.removeButton = cmds.button(parent = self, w = 100, h = 30,
@@ -50,7 +50,9 @@ class exportItem:
         
         # Filename text field
         self.textField = cmds.textField(parent = self, text = includedObjects[0], placeholderText = "filename",
-                                        annotation = "filename", w = 150, bgc = bgColor(-0.12))
+                                        annotation = "filename", w = 150, bgc = bgColor(-0.12),
+                                        textChangedCommand = self.textChanged)
+        self.filename = str(includedObjects[0])
 
         # Set up layout
         cmds.formLayout(self, edit = True, 
@@ -67,7 +69,14 @@ class exportItem:
                         attachPosition = [(self.selectButton, 'bottom', 2, 50),
                                           (self.removeButton, 'top', 2, 50)])
     
-    def selectThis(self):
+    def textChanged(self, *args):
+        self.filename = args[0]
+
+    def selectThis(self, modifiers = False):
+        if (not modifiers):
+            cmds.select(self.includedObjects, replace = True)
+            return
+        
         mods = getModifiers()
         shift = mods.__contains__('Shift')
         ctrl = mods.__contains__('Ctrl')
@@ -157,9 +166,19 @@ class directoryField:
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 
+def export(*args):
+    if (len(exportsList) <= 0):
+        print("Nothing to export.")
+    
+    for item in exportsList:
+        item.selectThis()
+        directory = f"{dirField.directory}/{item.filename}.fbx"
+        print(f"exporting {item.filename} to {directory}")
+        cmds.file(directory, exportSelected = True, force = True, type = "FBX export",
+                  preserveReferences = True, options="v=0;")
+
 def addSelectedSeparate(*args):
     selected = cmds.ls(selection = True)
-    print(selected)
     if (len(selected) <= 0):
         print("No objects selected.")
         return
@@ -194,12 +213,19 @@ def addSelectedSingle(*args):
 
 def createSettingsPane(coreLayout):
     settingsPane = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
-
+    
+    # Export button
+    exportButton = cmds.button(parent = settingsPane, h = 30, command = export, label = "Export")
+    cmds.formLayout(settingsPane, edit = True,
+                    attachForm = [(exportButton, 'left', 5), (exportButton, 'right', 0), (exportButton, 'bottom', 5)])
+    
     # File directory field
+    global dirField
     dirField = directoryField(parent = settingsPane)
     
     cmds.formLayout(settingsPane, edit = True,
-                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 0), (dirField, 'bottom', 5)])
+                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 0)],
+                    attachControl = [(dirField, 'bottom', 5, exportButton)])
                     
     return settingsPane
 
