@@ -31,40 +31,42 @@ class exportItem:
         # Scrollable list of objects included
         self.includedObjects = includedObjects
 
-        self.scrollLayout = cmds.scrollLayout(parent = self, childResizable = True, bgc = bgColor(-0.09))
+        self.scrollLayout = cmds.scrollLayout(parent = self, childResizable = True, bgc = bgColor(-0.09),
+                                              annotation = "Objects included in this export")
         for item in includedObjects:
             cmds.text(item, parent = self.scrollLayout, align = 'left')
 
         # Select object(s) button
         self.selectButton = cmds.button(parent = self, w = 100, h = 30,
-                                        label = "Select object(s)", annotation = "Selects objects included in this export. Works with Shift/Ctrl.",
+                                        label = "Select object(s)", annotation = "Selects objects included in this export. Works with Shift/Ctrl",
                                         bgc = bgColor(0.09), command = lambda _: self.selectThis())
         
         # Remove from list button
         self.removeButton = cmds.button(parent = self, w = 100, h = 30,
-                                        label = "Remove from list", annotation = "Removes this from the list of exports.",
+                                        label = "Remove from list", annotation = "Removes this from the list of exports",
                                         bgc = bgColor(0.09), command = lambda _: self.removeThis())
         
         # Filename text field
-        self.textField = cmds.textField(parent = self, text = includedObjects[0], placeholderText = "filename")
+        self.textField = cmds.textField(parent = self, text = includedObjects[0], placeholderText = "filename",
+                                        annotation = "filename")
 
         # Set up layout
         cmds.formLayout(self, edit = True, 
-                        attachForm = [(self.scrollLayout, 'left', 4),
+                        attachForm = [(self.scrollLayout, 'right', 4),
                                       (self.scrollLayout, 'top', 4),
                                       (self.scrollLayout, 'bottom', 4),
                                       (self.textField, 'top', 4),
-                                      (self.textField, 'right', 4),
+                                      (self.textField, 'left', 4),
                                       (self.selectButton, 'top', 4),
                                       (self.removeButton, 'bottom', 4)],
-                        attachPosition = [(self.scrollLayout, 'right', 2, 40),
-                                          (self.selectButton, 'left', 2, 40),
-                                          (self.removeButton, 'left', 2, 40),
+                        attachPosition = [(self.textField, 'right', 2, 30),
+                                          (self.selectButton, 'left', 2, 30),
+                                          (self.removeButton, 'left', 2, 30),
                                           (self.selectButton, 'bottom', 2, 50),
                                           (self.removeButton, 'top', 2, 50),
-                                          (self.selectButton, 'right', 2, 70),
-                                          (self.removeButton, 'right', 2, 70),
-                                          (self.textField, 'left', 2, 70)])
+                                          (self.selectButton, 'right', 2, 60),
+                                          (self.removeButton, 'right', 2, 60),
+                                          (self.scrollLayout, 'left', 2, 60)])
     
     def selectThis(self):
         mods = getModifiers()
@@ -126,7 +128,7 @@ class directoryField:
 
         self.label = cmds.text("Path:", parent = self, align = 'left')
         self.field = cmds.textField(parent = self, placeholderText = "Choose an export directory",
-                                    annotation = "Path to where the file(s) will be saved.")
+                                    annotation = "Path to where the file(s) will be saved")
         self.button = cmds.symbolButton(parent = self, image = 'browseFolder_100.png',
                                         annotation = "Browse directory",
                                         command = lambda _: self.browseDir())
@@ -162,46 +164,55 @@ def addSelected(*args):
     exportsListLayout.controls += [item]
     exportsListLayout.updateLayout()
 
+
+
+def createSettingsTab(coreLayout):
+    settingsTab = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
+
+    # File directory field
+    dirField = directoryField(parent = settingsTab)
+    
+    cmds.formLayout(settingsTab, edit = True,
+                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 5), (dirField, 'bottom', 5)])
+                    
+    return settingsTab
+
+def createExportsTab(coreLayout):
+    exportsTab = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
+
+    # "Add Selected" Button
+    addButton = cmds.button(parent = exportsTab, w = 50, h = 30, 
+                            label = "Add Selection", annotation = "Adds selected objects as a new list element",
+                            command = addSelected)
+    
+    cmds.formLayout(exportsTab, edit = True,
+                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5), (addButton, 'right', 5)])
+
+    # Scroll area and list of exports
+    scrollLayout = cmds.scrollLayout(parent = exportsTab, childResizable = True, bgc = bgColor(-0.06))
+
+    global exportsListLayout
+    exportsListLayout = quickFormLayout(scrollLayout, False)
+
+    cmds.formLayout(exportsTab, edit = True,
+                    attachForm = [(scrollLayout, 'left', 5), (scrollLayout, 'right', 5), (scrollLayout, 'bottom', 5)],
+                    attachControl = [(scrollLayout, 'top', 5, addButton)])
+                    
+    return exportsTab
+
 def createWindow():
     if (cmds.window(windowName, exists = True)):
         cmds.deleteUI(windowName, window = True)
 
     window = cmds.window(windowName, title = "Beef Window", widthHeight = (500, 600), resizeToFitChildren = True)
 
-    coreLayout = cmds.formLayout(parent = window, enableBackground = False, numberOfDivisions = 100, w = 300, h = 200)
+    coreLayout = cmds.tabLayout(parent = window, enableBackground = False, w = 300, h = 200)
 
-    #region Settings layout (left side)
-    settingsLayout = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
-    cmds.formLayout(coreLayout, edit = True, 
-                    attachForm = [(settingsLayout, 'left', 0), (settingsLayout, 'top', 0), (settingsLayout, 'bottom', 0)],
-                    attachPosition = [(settingsLayout, 'right', 0, 50)])
-
-    # "Add Selected" Button
-    addButton = cmds.button(parent = settingsLayout, w = 50, h = 30, 
-                            label = "Add Selection", annotation = "Adds selected objects as a new list element.",
-                            command = addSelected)
+    exportsTab = createExportsTab(coreLayout)
+    settingsTab = createSettingsTab(coreLayout)
     
-    cmds.formLayout(settingsLayout, edit = True,
-                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5), (addButton, 'right', 5)])
 
-    # File directory field
-    dirField = directoryField(parent = settingsLayout)
-    
-    cmds.formLayout(settingsLayout, edit = True,
-                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 5), (dirField, 'bottom', 5)])
-
-    #endregion
-
-    # Scroll layout w/ list
-    global exportsListLayout
-    scrollLayout = cmds.scrollLayout(parent = coreLayout, childResizable = True, bgc = bgColor(-0.06))
-    exportsListLayout = quickFormLayout(scrollLayout, False)
-
-    cmds.formLayout(coreLayout, edit = True, 
-                    attachForm = [(scrollLayout, 'right', 5),
-                                  (scrollLayout, 'top', 5),
-                                  (scrollLayout, 'bottom', 5)],
-                    attachPosition = [(scrollLayout, 'left', 0, 50)])
+    cmds.tabLayout(coreLayout, edit = True, tabLabel = ((exportsTab, 'List of exports'), (settingsTab, 'Settings')))
 
     # Show Window
     cmds.showWindow(windowName)
