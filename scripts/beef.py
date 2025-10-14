@@ -166,45 +166,44 @@ def addSelected(*args):
 
 
 
-def createSettingsTab(coreLayout):
-    settingsTab = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
-
-    # File directory field
-    dirField = directoryField(parent = settingsTab)
-    
-    cmds.formLayout(settingsTab, edit = True,
-                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 5), (dirField, 'bottom', 5)])
-                    
-    return settingsTab
-
-def createExportsTab(coreLayout):
-    exportsTab = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
+def createSettingsPane(coreLayout):
+    settingsPane = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
 
     # "Add Selected" Button
-    addButton = cmds.button(parent = exportsTab, w = 50, h = 30, 
+    addButton = cmds.button(parent = settingsPane, w = 50, h = 30, 
                             label = "Add Selection", annotation = "Adds selected objects as a new list element",
                             command = addSelected)
     
-    cmds.formLayout(exportsTab, edit = True,
-                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5), (addButton, 'right', 5)])
+    cmds.formLayout(settingsPane, edit = True,
+                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5), (addButton, 'right', 0)])
+
+    # File directory field
+    dirField = directoryField(parent = settingsPane)
+    
+    cmds.formLayout(settingsPane, edit = True,
+                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 0), (dirField, 'bottom', 5)])
+                    
+    return settingsPane
+
+def createExportsPane(coreLayout):
+    exportsPane = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
 
     # Scroll area and list of exports
-    scrollLayout = cmds.scrollLayout(parent = exportsTab, childResizable = True, bgc = bgColor(-0.06))
+    scrollLayout = cmds.scrollLayout(parent = exportsPane, childResizable = True, bgc = bgColor(-0.06))
 
     global exportsListLayout
     exportsListLayout = quickFormLayout(scrollLayout, False)
 
-    cmds.formLayout(exportsTab, edit = True,
-                    attachForm = [(scrollLayout, 'left', 5), (scrollLayout, 'right', 5), (scrollLayout, 'bottom', 5)],
-                    attachControl = [(scrollLayout, 'top', 5, addButton)])
+    cmds.formLayout(exportsPane, edit = True,
+                    attachForm = [(scrollLayout, 'left', 0), (scrollLayout, 'right', 5), (scrollLayout, 'bottom', 5), (scrollLayout, 'top', 5)])
                     
-    return exportsTab
+    return exportsPane
 
 def createBeefUI():
     coreLayout = cmds.paneLayout(configuration = 'vertical2')
 
-    settingsTab = createSettingsTab(coreLayout)
-    exportsTab = createExportsTab(coreLayout)
+    settingsTab = createSettingsPane(coreLayout)
+    exportsTab = createExportsPane(coreLayout)
 
 def createWindow():
     """
