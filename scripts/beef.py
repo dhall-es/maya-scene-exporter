@@ -39,6 +39,8 @@ class exportItem:
         self.selectButton = cmds.button(parent = self, w = 100, h = 30,
                                         label = "Select object(s)", annotation = "Selects objects included in this export. Works with Shift/Ctrl.",
                                         bgc = bgColor(0.09), command = lambda _: self.selectThis())
+        
+        # Remove from list button
         self.removeButton = cmds.button(parent = self, w = 100, h = 30,
                                         label = "Remove from list", annotation = "Removes this from the list of exports.",
                                         bgc = bgColor(0.09), command = lambda _: self.removeThis())
@@ -118,11 +120,40 @@ class quickFormLayout:
     def __str__(self):
         return self.name
 
+class directoryField:
+    def __init__(self, parent):
+        self.name = cmds.formLayout(parent = parent, ebg = False, nd = 100)
+
+        self.label = cmds.text("Path:", parent = self, align = 'left')
+        self.field = cmds.textField(parent = self, placeholderText = "Choose an export directory",
+                                    annotation = "Path to where the file(s) will be saved.")
+        self.button = cmds.symbolButton(parent = self, image = 'browseFolder_100.png',
+                                        annotation = "Browse directory",
+                                        command = lambda _: self.browseDir())
+        self.directory = ""
+        
+        cmds.formLayout(self, edit = True,
+                        attachForm = [(self.label, 'left', 0), (self.button, 'right', 0),
+                                      (self.label, 'top', 0), (self.label, 'bottom', 0),
+                                      (self.field, 'top', 0), (self.field, 'bottom', 0),
+                                      (self.button, 'top', 0), (self.button, 'bottom', 0)],
+                        attachControl = [(self.field, 'left', 2, self.label), (self.field, 'right', 2, self.button)])
+        
+    def browseDir(self):
+        self.directory = cmds.fileDialog2(fileMode = 3)[0]
+        cmds.textField(self.field, edit = True, text = self.directory)
+        
+    def __str__(self):
+        return self.name
+
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 
 def addSelected(*args):
     selected = cmds.ls(selection = True)
+    if (len(selected) <= 0):
+        print("No objects selected.")
+        return
 
     item = exportItem(exportsListLayout, selected)
     
@@ -139,14 +170,27 @@ def createWindow():
 
     coreLayout = cmds.formLayout(parent = window, enableBackground = False, numberOfDivisions = 100, w = 300, h = 200)
 
+    #region Settings layout (left side)
+    settingsLayout = cmds.formLayout(parent = coreLayout, ebg = False, nd = 100, w = 150, h = 100)
+    cmds.formLayout(coreLayout, edit = True, 
+                    attachForm = [(settingsLayout, 'left', 0), (settingsLayout, 'top', 0), (settingsLayout, 'bottom', 0)],
+                    attachPosition = [(settingsLayout, 'right', 0, 50)])
+
     # "Add Selected" Button
-    addButton = cmds.button(parent = coreLayout, h = 30, 
+    addButton = cmds.button(parent = settingsLayout, w = 50, h = 30, 
                             label = "Add Selection", annotation = "Adds selected objects as a new list element.",
                             command = addSelected)
     
-    cmds.formLayout(coreLayout, edit = True,
-                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5)],
-                    attachPosition = [(addButton, 'right', 5, 40)])
+    cmds.formLayout(settingsLayout, edit = True,
+                    attachForm = [(addButton, 'left', 5), (addButton, 'top', 5), (addButton, 'right', 5)])
+
+    # File directory field
+    dirField = directoryField(parent = settingsLayout)
+    
+    cmds.formLayout(settingsLayout, edit = True,
+                    attachForm = [(dirField, 'left', 5), (dirField, 'right', 5), (dirField, 'bottom', 5)])
+
+    #endregion
 
     # Scroll layout w/ list
     global exportsListLayout
@@ -157,7 +201,7 @@ def createWindow():
                     attachForm = [(scrollLayout, 'right', 5),
                                   (scrollLayout, 'top', 5),
                                   (scrollLayout, 'bottom', 5)],
-                    attachPosition = [(scrollLayout, 'left', 0, 40)])
+                    attachPosition = [(scrollLayout, 'left', 0, 50)])
 
     # Show Window
     cmds.showWindow(windowName)
