@@ -11,10 +11,6 @@ import maya.cmds as cmds
 # Skinning | cmds.FBXProperty('Export|IncludeGrp|Animation|Deformation|Skins', '-v', 1)
 # Blendshapes | cmds.FBXProperty('Export|IncludeGrp|Animation|Deformation|Shape', '-v', 1)
 
-windowName = "beefWindow"
-
-exportsList = []
-
 def getModifiers():
     output = []
     mods = cmds.getModifiers()
@@ -324,12 +320,15 @@ def createExportsPane(coreLayout):
     return exportsPane
 
 def createBeefUI():
+    global exportsList
+    exportsList = []
+
     coreLayout = cmds.paneLayout(configuration = 'vertical2')
 
     settingsTab = createSettingsPane(coreLayout)
     exportsTab = createExportsPane(coreLayout)
 
-def createWindow():
+def createWindow(windowName):
     """
     Backup function for creating the window. Ideally you would use workspaceControl since it docks to the UI,
     but sometimes they can be a little finnicky.
@@ -348,4 +347,4 @@ def createWorkspaceControl(windowName):
     cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "createBeefUI()",
                           mw = 500, mh = 600, label = "Exporter")
 
-createWorkspaceControl(windowName)
+# createWorkspaceControl("beefWindow")

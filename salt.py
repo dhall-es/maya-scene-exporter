@@ -87,4 +87,4 @@ def facesToEdgePerimeter():
     cmds.select(clear = True)
     cmds.select(externalEdges)
 
-facesToEdgePerimeter()
+# facesToEdgePerimeter()
