@@ -1,5 +1,16 @@
 import maya.cmds as cmds
 
+# https://polycount.com/discussion/232359/example-of-using-fbxproperties-mel-command-to-query-all-properties
+
+# Smoothing Groups | cmds.FBXProperty('Export|IncludeGrp|Geometry|SmoothingGroups', '-v', 1)
+# Smooth Mesh | cmds.FBXProperty('Export|IncludeGrp|Geometry|SmoothMesh', '-v', 1)
+# Split Vertex Normals | cmds.FBXProperty('Export|IncludeGrp|Geometry|expHardEdges', '-v', 0)
+# Triangulate | cmds.FBXProperty('Export|IncludeGrp|Geometry|Triangulate', '-v', 0)
+# Tangents & Binormals | cmds.FBXProperty('Export|IncludeGrp|Geometry|TangentsandBinormals', '-v', 0)
+
+# Skinning | cmds.FBXProperty('Export|IncludeGrp|Animation|Deformation|Skins', '-v', 1)
+# Blendshapes | cmds.FBXProperty('Export|IncludeGrp|Animation|Deformation|Shape', '-v', 1)
+
 windowName = "beefWindow"
 
 exportsList = []
@@ -160,6 +171,41 @@ class directoryField:
     def __str__(self):
         return self.name
 
+class fbxCheckbox:
+    def __init__(self, parent, label, defaultValue, fbxproperty):
+        self.name = cmds.checkBox(p = parent, l = label, v = defaultValue,
+                                  changeCommand = lambda _: self.onUIChanged())
+        self.fbxproperty = fbxproperty
+        self.value = defaultValue
+    
+    def onUIChanged(self):
+        self.value = cmds.checkBox(self, query = True, value = True)
+    
+    def sendProperty(self):
+        cmds.FBXProperty(self.fbxproperty, '-v', int(self.value))
+
+    def __str__(self):
+        return self.name
+
+class fbxSettingsLayout (quickFormLayout):
+    def __init__(self, parent):
+        super().__init__(parent = parent, ebg = False)
+
+        self.controls += [fbxCheckbox(self, "Smoothing Groups", True, 'Export|IncludeGrp|Geometry|SmoothingGroups')]
+        self.controls += [fbxCheckbox(self, "Smooth Mesh", True, 'Export|IncludeGrp|Geometry|SmoothMesh')]
+        self.controls += [fbxCheckbox(self, "Split Vertex Normals", False, 'Export|IncludeGrp|Geometry|expHardEdges')]
+        self.controls += [fbxCheckbox(self, "Triangulate", False, 'Export|IncludeGrp|Geometry|Triangulate')]
+        self.controls += [fbxCheckbox(self, "Tangents & Binormals", False, 'Export|IncludeGrp|Geometry|TangentsandBinormals')]
+
+        self.controls += [fbxCheckbox(self, "Skinning", True, 'Export|IncludeGrp|Animation|Deformation|Skins')]
+        self.controls += [fbxCheckbox(self, "Blendshapes", True, 'Export|IncludeGrp|Animation|Deformation|Shape')]
+
+        self.updateLayout()
+
+    def sendProperties(self):
+        for checkbox in self.controls:
+            checkbox.sendProperty()
+
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 
@@ -167,6 +213,9 @@ def export(*args):
     if (len(exportsList) <= 0):
         print("Nothing to export.")
     
+    global fbxSettings
+    fbxSettings.sendProperties()
+
     for item in exportsList:
         item.selectThis()
         if (item.filename == ""):
@@ -228,7 +277,15 @@ def createSettingsPane(coreLayout):
     cmds.formLayout(settingsPane, edit = True,
                     attachForm = [(dirField, 'left', 5), (dirField, 'right', 0)],
                     attachControl = [(dirField, 'bottom', 5, exportButton)])
-                    
+    
+    global fbxSettings
+    fbxSettings = fbxSettingsLayout(settingsPane)
+
+    cmds.formLayout(settingsPane, edit = True,
+                    attachForm = [(fbxSettings, 'left', 5),
+                                  (fbxSettings, 'right', 0),
+                                  (fbxSettings, 'top', 5)])
+
     return settingsPane
 
 def createExportsPane(coreLayout):
@@ -283,8 +340,6 @@ def createWindow():
     window = cmds.window(windowName, title = "Beef Window", widthHeight = (500, 600), resizeToFitChildren = True)
     createBeefUI(window)
     cmds.showWindow(windowName)
-
-
 
 def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
