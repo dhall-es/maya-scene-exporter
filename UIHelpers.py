@@ -3,30 +3,71 @@ import maya.cmds as cmds
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 
-class quickFormLayout:
+class verticalFormLayout:
     def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27]):
         self.name = cmds.formLayout(parent = parent,
                                     enableBackground = ebg,
                                     backgroundColor = bgc,
                                     numberOfDivisions = 100)
         
-        self.controls = []
+        self.controls = {
+            'top' : [],
+            'bottom' : []
+        }
     
-    def updateLayout(self, horizontalOffset = 4, verticalOffset = 4):
-        if (len(self.controls) <= 0):
-            return
-        
-        attachForm = []
-        attachForm += [(self.controls[0], 'top', verticalOffset)]
-
-        for control in self.controls:
-            attachForm += [(control, 'left', horizontalOffset)]
-            attachForm += [(control, 'right', horizontalOffset)]
-        
+    def updateLayout(self, xOffset = 4, yOffset = 4):
         attachControl = []
-        for i in range(1, len(self.controls)):
-            attachControl += [(self.controls[i], 'top', verticalOffset, self.controls[i - 1])]
+        attachForm = []
+
+        for align in ['top', 'bottom']:
+            if (len(self.controls[align]) <= 0):
+                continue
+            
+            attachForm += [(self.controls[align][0], align, yOffset)]
+
+            for control in self.controls[align]:
+                attachForm += [(control, 'left', xOffset)]
+                attachForm += [(control, 'right', xOffset)]
+            
+            for i in range(1, len(self.controls[align])):
+                attachControl += [(self.controls[align][i], align, yOffset, self.controls[align][i - 1])]
+
+        cmds.formLayout(self.name, edit = True,
+                        attachForm = attachForm,
+                        attachControl = attachControl)
+    
+    def __str__(self):
+        return self.name
+
+class horizontalFormLayout:
+    def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27]):
+        self.name = cmds.formLayout(parent = parent,
+                                    enableBackground = ebg,
+                                    backgroundColor = bgc,
+                                    numberOfDivisions = 100)
         
+        self.controls = {
+            'left' : [],
+            'right' : []
+        }
+    
+    def updateLayout(self, xOffset = 4, yOffset = 4):
+        attachControl = []
+        attachForm = []
+
+        for align in ['left', 'right']:
+            if (len(self.controls[align]) <= 0):
+                continue
+            
+            attachForm += [(self.controls[align][0], align, yOffset)]
+
+            for control in self.controls[align]:
+                attachForm += [(control, 'top', xOffset)]
+                attachForm += [(control, 'bottom', xOffset)]
+            
+            for i in range(1, len(self.controls[align])):
+                attachControl += [(self.controls[align][i], align, yOffset, self.controls[align][i - 1])]
+
         cmds.formLayout(self.name, edit = True,
                         attachForm = attachForm,
                         attachControl = attachControl)

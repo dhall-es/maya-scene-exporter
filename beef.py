@@ -100,7 +100,7 @@ class exportItem:
 
         global exportsList
         exportsList.remove(self)
-        exportsListLayout.controls.remove(self)
+        exportsListLayout.controls['top'].remove(self)
         exportsListLayout.updateLayout()
 
         global exportsCountLabel
@@ -125,23 +125,23 @@ class fbxCheckbox:
     def __str__(self):
         return self.name
 
-class fbxSettingsLayout (quickFormLayout):
+class fbxSettingsLayout (verticalFormLayout):
     def __init__(self, parent):
         super().__init__(parent = parent, ebg = False)
 
-        self.controls += [fbxCheckbox(self, "Smoothing Groups", True, 'Export|IncludeGrp|Geometry|SmoothingGroups')]
-        self.controls += [fbxCheckbox(self, "Smooth Mesh", True, 'Export|IncludeGrp|Geometry|SmoothMesh')]
-        self.controls += [fbxCheckbox(self, "Split Vertex Normals", False, 'Export|IncludeGrp|Geometry|expHardEdges')]
-        self.controls += [fbxCheckbox(self, "Triangulate", False, 'Export|IncludeGrp|Geometry|Triangulate')]
-        self.controls += [fbxCheckbox(self, "Tangents & Binormals", False, 'Export|IncludeGrp|Geometry|TangentsandBinormals')]
+        self.controls['top'] += [fbxCheckbox(self, "Smoothing Groups", True, 'Export|IncludeGrp|Geometry|SmoothingGroups')]
+        self.controls['top'] += [fbxCheckbox(self, "Smooth Mesh", True, 'Export|IncludeGrp|Geometry|SmoothMesh')]
+        self.controls['top'] += [fbxCheckbox(self, "Split Vertex Normals", False, 'Export|IncludeGrp|Geometry|expHardEdges')]
+        self.controls['top'] += [fbxCheckbox(self, "Triangulate", False, 'Export|IncludeGrp|Geometry|Triangulate')]
+        self.controls['top'] += [fbxCheckbox(self, "Tangents & Binormals", False, 'Export|IncludeGrp|Geometry|TangentsandBinormals')]
 
-        self.controls += [fbxCheckbox(self, "Skinning", True, 'Export|IncludeGrp|Animation|Deformation|Skins')]
-        self.controls += [fbxCheckbox(self, "Blendshapes", True, 'Export|IncludeGrp|Animation|Deformation|Shape')]
+        self.controls['top'] += [fbxCheckbox(self, "Skinning", True, 'Export|IncludeGrp|Animation|Deformation|Skins')]
+        self.controls['top'] += [fbxCheckbox(self, "Blendshapes", True, 'Export|IncludeGrp|Animation|Deformation|Shape')]
 
         self.updateLayout()
 
     def sendProperties(self):
-        for checkbox in self.controls:
+        for checkbox in self.controls['top']:
             checkbox.sendProperty()
 
 def export(*args):
@@ -174,7 +174,7 @@ def addSelectedSeparate(*args):
     
         global exportsList
         exportsList += [item]
-        exportsListLayout.controls += [item]
+        exportsListLayout.controls['top'] += [item]
     
     exportsListLayout.updateLayout()
 
@@ -191,7 +191,7 @@ def addSelectedSingle(*args):
     
     global exportsList
     exportsList += [item]
-    exportsListLayout.controls += [item]
+    exportsListLayout.controls['top'] += [item]
     exportsListLayout.updateLayout()
 
     global exportsCountLabel
@@ -250,7 +250,7 @@ def createExportsPane(coreLayout):
     scrollLayout = cmds.scrollLayout(parent = exportsPane, childResizable = True, bgc = bgColor(-0.06))
 
     global exportsListLayout
-    exportsListLayout = quickFormLayout(scrollLayout, False)
+    exportsListLayout = verticalFormLayout(scrollLayout, False)
 
     cmds.formLayout(exportsPane, edit = True,
                     attachForm = [(scrollLayout, 'left', 0), (scrollLayout, 'right', 5), (scrollLayout, 'bottom', 5)],
