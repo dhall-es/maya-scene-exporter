@@ -311,7 +311,7 @@ class clonesUI:
                 continue
             
             clones += [transform(item)]
-        
+
         self.updateClonesList()
 
         if (syncSelectEnabled):
@@ -319,7 +319,7 @@ class clonesUI:
 
     def updateClonesList(self):
         cmds.textScrollList(self.clonesList, edit = True, removeAll = True)
-        cmds.textScrollList(self.clonesList, edit = True, append = clones)
+        cmds.textScrollList(self.clonesList, edit = True, append = sorted(clones, key = lambda t: t.name))
 
     def __str__(self):
         return self.name
