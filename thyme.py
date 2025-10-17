@@ -108,7 +108,34 @@ class settingsUI:
                         attachControl = [(self.nameField, 'top', 4, self.title),
                                         (self.setButton, 'top', 4, self.title),
                                         (self.nameField, 'right', 4, self.setButton)])
+        
+        self.exportButton = cmds.button(p = self, h = 30, label = "Export CSV",
+                                        command = lambda _: exportCSV(self.exportDir()))
+        cmds.formLayout(self, edit = True,
+                        attachForm = [(self.exportButton, 'left', lOffset),
+                                      (self.exportButton, 'right', rOffset),
+                                      (self.exportButton, 'bottom', 4)])
+
+        self.filenameField = cmds.textField(p = self, bgc = bgColor(-0.1), placeholderText = "filename")
+        cmds.formLayout(self, edit = True,
+                        attachForm = [(self.filenameField, 'left', lOffset),
+                                      (self.filenameField, 'right', rOffset)],
+                        attachControl = [(self.filenameField, 'bottom', 4, self.exportButton)])
+
+        self.dirField = directoryField(self)
+        cmds.formLayout(self, edit = True,
+                        attachForm = [(self.dirField, 'left', lOffset),
+                                      (self.dirField, 'right', rOffset)],
+                        attachControl = [(self.dirField, 'bottom', 4, self.filenameField)])
     
+    def exportDir(self):
+        import re
+        
+        fullName = cmds.textField(self.filenameField, query = True, text = True)
+        fileName = re.sub(r'[^a-zA-Z0-9]', '', fullName)
+
+        return f"{self.dirField.directory}/{fileName}.csv"
+
     def setSourceToSelected(self):
         selection = cmds.ls(selection = True, type = 'transform')
         if (len(selection) != 1):
@@ -323,6 +350,33 @@ class clonesUI:
 
     def __str__(self):
         return self.name
+
+def exportCSV(folderPath):
+    import csv
+
+    global clones
+    fullPath = f"{folderPath}/{sourceObject}.csv"
+
+    columns = ['name']
+    columns += ['translate']
+    columns += ['rotate']
+    columns += ['scale']
+
+    # 'w' for writing
+    with open(fullPath, 'w', newline = '') as file:
+        writer = csv.writer(file)
+        writer.writerow(columns)
+
+        for clone in ([sourceObject] + clones):
+            data = []
+            data.append(clone.name)
+
+            data.append(clone.attributes['translate'])
+            data.append(clone.attributes['rotate'])
+            data.append(clone.attributes['scale'])
+
+            writer.writerow(data)
+            del data
 
 def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
