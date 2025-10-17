@@ -1,5 +1,20 @@
 import maya.cmds as cmds
 
+def getModifiers():
+    output = []
+    mods = cmds.getModifiers()
+
+    if (mods & 1) > 0:
+        output += ['Shift']
+    if (mods & 4) > 0:
+        output += ['Ctrl']
+    if (mods & 8) > 0:
+        output += ['Alt']
+    if (mods & 16):
+        output += ['Win']
+    
+    return output
+
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 

@@ -12,21 +12,6 @@ from UIHelpers import *
 # Skinning | cmds.FBXProperty('Export|IncludeGrp|Animation|Deformation|Skins', '-v', 1)
 # Blendshapes | cmds.FBXProperty('Export|IncludeGrp|Animation|Deformation|Shape', '-v', 1)
 
-def getModifiers():
-    output = []
-    mods = cmds.getModifiers()
-
-    if (mods & 1) > 0:
-        output += ['Shift']
-    if (mods & 4) > 0:
-        output += ['Ctrl']
-    if (mods & 8) > 0:
-        output += ['Alt']
-    if (mods & 16):
-        output += ['Win']
-    
-    return output
-
 class exportItem:
     def __init__(self, parent, includedObjects):
         self.name = cmds.formLayout(parent = parent,
