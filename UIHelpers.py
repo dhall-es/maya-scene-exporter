@@ -18,6 +18,22 @@ def getModifiers():
 def bgColor(offset = 0):
     return [0.27 + offset, 0.27 + offset, 0.27 + offset]
 
+class fileNameField:
+    def __init__(self, parent):
+        self.name = cmds.textField(p = parent, bgc = bgColor(-0.1), placeholderText = "filename", tcc = self.changeCommand)
+        self.text = ""
+    
+    def changeCommand(self, *args):
+        import re
+
+        raw = cmds.textField(self, query = True, text = True)
+        self.text = re.sub(r'[\\/:*?"<>|]+', '', raw)
+
+        cmds.textField(self, edit = True, text = self.text)
+
+    def __str__(self):
+        return self.name
+
 class verticalFormLayout:
     def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27]):
         self.name = cmds.formLayout(parent = parent,
