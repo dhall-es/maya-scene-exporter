@@ -11,8 +11,8 @@ from UIHelpers import *
 
 # background color for toggles = #5285a6 or [0.32, 0.52, 0.65]
 
-global clones
-clones = []
+global currentPackage
+currentPackage = None
 
 global rootTransform
 rootTransform = None
@@ -63,6 +63,9 @@ class package:
                         attachForm = [(self.buttons, 'left', 2),
                                       (self.buttons, 'right', 2),
                                       (self.buttons, 'bottom', 2)])
+
+    def updateUI(self):
+        cmds.text(self.itemCount, edit = True, label = f"{len(self.items)} Item(s)")
 
     def __str__(self):
         return self.name
@@ -116,7 +119,7 @@ class transform:
             return self.name == value
         pass
 
-def cloneManagerUI():
+def packageManagerUI():
     topBottomPanes = cmds.paneLayout(configuration = 'horizontal2')
     leftRightPanes = cmds.paneLayout(configuration = 'vertical2', p = topBottomPanes)
 
@@ -151,8 +154,7 @@ class settingsUI:
                                         (self.setButton, 'top', 4, self.title),
                                         (self.nameField, 'right', 4, self.setButton)])
         
-        self.exportButton = cmds.button(p = self, h = 30, label = "Export CSV",
-                                        command = lambda _: exportCSV(f"{self.dirField.directory}/{self.fileName.text}.csv"))
+        self.exportButton = cmds.button(p = self, h = 30, label = "Export")
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.exportButton, 'left', lOffset),
                                       (self.exportButton, 'right', rOffset),
@@ -176,7 +178,6 @@ class settingsUI:
             print("Must have only one object selected to set the root transform.")
             return
 
-        global clones
         global rootTransform
         global packEditorPane
         
@@ -205,7 +206,7 @@ class packManagerUI:
                                     (self.title, 'right', rOffset)])
         
         self.scrollLayout = cmds.scrollLayout(p = self, childResizable = True, bgc = bgColor(-0.1))
-        self.packageList = verticalFormLayout(self.scrollLayout, False)
+        self.packageList = verticalFormLayout(self.scrollLayout, False, h = 100)
 
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.scrollLayout, 'left', lOffset),
@@ -213,11 +214,16 @@ class packManagerUI:
                                       (self.scrollLayout, 'bottom', 2)],
                         attachControl = [(self.scrollLayout, 'top', 4, self.title)])
         
-        self.addPackage()
+        global currentPackage
+        currentPackage = self.addPackage()
 
     def addPackage(self):
-        self.packageList.controls['top'] += [package(self.packageList)]
+        new = package(self.packageList)
+
+        self.packageList.controls['top'] += [new]
         self.packageList.updateLayout()
+
+        return new
 
     def __str__(self):
         return self.name
@@ -234,29 +240,29 @@ class packEditorUI:
         
         self.buttons = horizontalFormLayout(self, ebg = False)
 
-        self.clonesList = cmds.textScrollList(p = self, allowMultiSelection = True)
+        self.itemsList = cmds.textScrollList(p = self, allowMultiSelection = True)
         
         self.deleteIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
-                            i = 'deleteGeneric_100.png', annotation = "Delete clones selected in this list",
+                            i = 'deleteGeneric_100.png', annotation = "Delete items selected in this list",
                             command = self.deleteSelection)
         self.addIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
-                            i = 'addCreateGeneric_100.png', annotation = "Add/Update clones selected in the scene",
+                            i = 'addCreateGeneric_100.png', annotation = "Add/Update items selected in the scene",
                             command = self.addSelection)
         
         self.refreshIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
-                            i = 'refresh.png', annotation = "Update clones that have been moved/deleted",
+                            i = 'refresh.png', annotation = "Update items that have been moved/deleted",
                             command = self.refreshAll)
-        self.syncIcon = self.syncSelectButton(parent = self.buttons, clonesList = self.clonesList)
+        self.syncIcon = self.syncSelectButton(parent = self.buttons, itemsList = self.itemsList)
 
         self.buttons.controls['right'] = [self.deleteIcon, self.addIcon]
         self.buttons.controls['left'] = [self.refreshIcon, self.syncIcon]
         self.buttons.updateLayout(0, 0)
 
         cmds.formLayout(self, edit = True,
-                        attachForm = [(self.clonesList, 'left', lOffset),
-                                    (self.clonesList, 'bottom', 2),
-                                    (self.clonesList, 'right', rOffset)],
-                        attachControl = [(self.clonesList, 'top', 2, self.buttons)])
+                        attachForm = [(self.itemsList, 'left', lOffset),
+                                    (self.itemsList, 'bottom', 2),
+                                    (self.itemsList, 'right', rOffset)],
+                        attachControl = [(self.itemsList, 'top', 2, self.buttons)])
 
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.buttons, 'left', lOffset),
@@ -264,23 +270,25 @@ class packEditorUI:
                         attachControl = [(self.buttons, 'top', 2, self.title)])
 
     def refreshAll(self):
-        global clones
-        for clone in clones:
-            if (not clone.update()):
-                clones.remove(clone)
-        self.updateClonesList()
+        global currentPackage
+
+        for item in currentPackage.items:
+            if (not item.update()):
+                currentPackage.items.remove(item)
+        self.updateItemsList()
 
     def deleteSelection(self):
-        selection = cmds.textScrollList(self.clonesList, query = True, selectItem = True)
+        selection = cmds.textScrollList(self.itemsList, query = True, selectItem = True)
         if (selection == None):
             print("No items in list selected.")
             return
 
-        global clones
-        for item in selection:
-            clones.remove(item)
+        global currentPackage
 
-        self.updateClonesList()
+        for item in selection:
+            currentPackage.items.remove(item)
+
+        self.updateItemsList()
 
     def addSelection(self):
         selection = cmds.ls(selection = True, type = 'transform')
@@ -289,32 +297,33 @@ class packEditorUI:
             return
 
         global rootTransform
-        global clones
+        global currentPackage
 
         for item in selection:
             if (item == rootTransform):
                 continue
 
-            if (item in clones):
-                clones[clones.index(item)].update()
+            if (item in currentPackage.items):
+                currentPackage.items[currentPackage.items.index(item)].update()
                 continue
             
-            clones += [transform(item)]
+            currentPackage.items += [transform(item)]
 
-        self.updateClonesList()
+        self.updateItemsList()
 
         if (syncSelectEnabled):
-            cmds.textScrollList(self.clonesList, edit = True, selectItem = selection)
+            cmds.textScrollList(self.itemsList, edit = True, selectItem = selection)
 
-    def updateClonesList(self):
-        cmds.textScrollList(self.clonesList, edit = True, removeAll = True)
-        cmds.textScrollList(self.clonesList, edit = True, append = sorted(clones, key = lambda t: t.name))
+    def updateItemsList(self):
+        cmds.textScrollList(self.itemsList, edit = True, removeAll = True)
+        cmds.textScrollList(self.itemsList, edit = True, append = sorted(currentPackage.items, key = lambda t: t.name))
+        currentPackage.updateUI()
 
     def __str__(self):
         return self.name
 
     class syncSelectButton:
-        def __init__(self, parent, clonesList):
+        def __init__(self, parent, itemsList):
             self.name = cmds.iconTextButton(p = parent, style = 'iconOnly', bgc = [0.32, 0.52, 0.65], ebg = False,
                                 i = 'selectCycle.png', annotation = "Toggle sync selection." \
                                 "\nHold CTRL to transfer list selection to scene." \
@@ -323,8 +332,8 @@ class packEditorUI:
             
             self.syncSelectJob = -1
 
-            cmds.textScrollList(clonesList, edit = True, selectCommand = self.listSelectionChanged)
-            self.clonesList = clonesList
+            cmds.textScrollList(itemsList, edit = True, selectCommand = self.listSelectionChanged)
+            self.itemsList = itemsList
         
         def pressSyncSelect(self):
             modifiers = getModifiers()
@@ -359,83 +368,57 @@ class packEditorUI:
             self.quickSyncSelection()
             
         def quickSyncSelection(self):
-            listSelection = cmds.textScrollList(self.clonesList, query = True, selectItem = True)
+            listSelection = cmds.textScrollList(self.itemsList, query = True, selectItem = True)
             sceneSelection = cmds.ls(selection = True, type = 'transform')
             
-            cmds.textScrollList(self.clonesList, edit = True, deselectAll = True)
+            cmds.textScrollList(self.itemsList, edit = True, deselectAll = True)
             
             if (listSelection == None):
                 listSelection = []
 
-            for clone in clones:
-                if (clone in sceneSelection or clone in listSelection):
-                    cmds.textScrollList(self.clonesList, edit = True,selectItem = clone)
-                    cmds.select(clone, add = True)
+            for item in currentPackage.items:
+                if (item in sceneSelection or item in listSelection):
+                    cmds.textScrollList(self.itemsList, edit = True,selectItem = item)
+                    cmds.select(item, add = True)
                 else:
-                    cmds.select(clone, deselect = True)
+                    cmds.select(item, deselect = True)
 
         def sceneSelectionChanged(self, force = False):
             if (not syncSelectEnabled and not force):
                 return
 
             selection = cmds.ls(selection = True, type = 'transform')
-            cmds.textScrollList(self.clonesList, edit = True, deselectAll = True)
+            cmds.textScrollList(self.itemsList, edit = True, deselectAll = True)
 
             if (len(selection) <= 0):
                 return
 
-            for clone in clones:
-                if (clone in selection):
-                    cmds.textScrollList(self.clonesList, edit = True, selectItem = clone)
+            for item in currentPackage.items:
+                if (item in selection):
+                    cmds.textScrollList(self.itemsList, edit = True, selectItem = item)
         
         def listSelectionChanged(self, force = False):
             if (not syncSelectEnabled and not force):
                 return
             
-            selection = cmds.textScrollList(self.clonesList, query = True, selectItem = True)
+            selection = cmds.textScrollList(self.itemsList, query = True, selectItem = True)
             if (selection == None):
                 selection = []
 
-            for clone in clones:
-                if (clone in selection):
-                    cmds.select(clone, add = True)
+            for item in currentPackage.items:
+                if (item in selection):
+                    cmds.select(item, add = True)
                 else:
-                    cmds.select(clone, deselect = True)
+                    cmds.select(item, deselect = True)
         
         def __str__(self):
             return self.name
-
-def exportCSV(fullPath):
-    import csv
-
-    global clones
-
-    columns = ['name']
-    columns += ['translate']
-    columns += ['rotate']
-    columns += ['scale']
-
-    # 'w' for writing
-    with open(fullPath, 'w', newline = '') as file:
-        writer = csv.writer(file)
-        writer.writerow(columns)
-
-        for clone in ([rootTransform] + clones):
-            data = []
-            data.append(clone.name)
-
-            data.append(clone.attributes['translate'])
-            data.append(clone.attributes['rotate'])
-            data.append(clone.attributes['scale'])
-
-            writer.writerow(data)
-            del data
 
 def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
             cmds.workspaceControl(windowName, edit=True, close = True)
 
-    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "cloneManagerUI()",
-                          mw = 500, mh = 600, label = "Clone Manager")
+    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "packageManagerUI()",
+                          mw = 500, mh = 600, label = "Package Exporter")
 
-createWorkspaceControl("cloneManagerWindow")
+createWorkspaceControl("packageManagerWindow")

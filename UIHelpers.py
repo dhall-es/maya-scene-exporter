@@ -35,11 +35,13 @@ class fileNameField:
         return self.name
 
 class verticalFormLayout:
-    def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27]):
+    def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27], w = 25, h = 25):
         self.name = cmds.formLayout(parent = parent,
                                     enableBackground = ebg,
                                     backgroundColor = bgc,
-                                    numberOfDivisions = 100)
+                                    numberOfDivisions = 100,
+                                    w = w,
+                                    h = h)
         
         self.controls = {
             'top' : [],
@@ -71,11 +73,13 @@ class verticalFormLayout:
         return self.name
 
 class horizontalFormLayout:
-    def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27]):
+    def __init__(self, parent, ebg = True, bgc = [0.27, 0.27, 0.27], w = 25, h = 25):
         self.name = cmds.formLayout(parent = parent,
                                     enableBackground = ebg,
                                     backgroundColor = bgc,
-                                    numberOfDivisions = 100)
+                                    numberOfDivisions = 100,
+                                    w = w,
+                                    h = h)
         
         self.controls = {
             'left' : [],
