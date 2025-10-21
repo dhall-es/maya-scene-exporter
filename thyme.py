@@ -107,6 +107,9 @@ class package:
             cmds.iconTextButton(self.openIcon, edit = True, ebg = False,
                                 annotation = "Move to package editor")
 
+    def getFileName(self):
+        return self.nameField.text
+
     def __str__(self):
         return self.name
 
@@ -131,6 +134,7 @@ class transform:
             scale[i] /= value
 
         return {
+            'name' : self.name,
             'translate' : translate,
             'rotate' : rotate,
             'scale' : scale
@@ -143,8 +147,13 @@ class transform:
             return False
 
         if (force):
+            translate = list(cmds.getAttr(f"{self}.translate")[0])
+            pivot = list(cmds.getAttr(f"{self}.rotatePivot")[0])
+            for i in range(len(translate)): translate[i] += pivot[i]
+
             self.attributes = {
-                'translate' : list(cmds.getAttr(f"{self}.translate")[0]),
+                'name' : self.name,
+                'translate' : translate,
                 'rotate' : list(cmds.getAttr(f"{self}.rotate")[0]),
                 'scale' : list(cmds.getAttr(f"{self}.scale")[0]),
             }
@@ -194,7 +203,8 @@ class settingsUI:
                                         (self.setButton, 'top', 4, self.title),
                                         (self.nameField, 'right', 4, self.setButton)])
         
-        self.exportButton = cmds.button(p = self, h = 30, label = "Export")
+        self.exportButton = cmds.button(p = self, h = 30, label = "Export",
+                                        command = lambda _: exportToJSON(f"{self.dirField.directory}/{self.fileName.text}.json"))
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.exportButton, 'left', lOffset),
                                       (self.exportButton, 'right', rOffset),
@@ -487,6 +497,31 @@ class packEditorUI:
         
         def __str__(self):
             return self.name
+
+def exportToJSON(fullPath):
+    import json
+    packageData = []
+    
+    global packManagerPane
+    for package in packManagerPane.packageList.controls['top']:
+        transformData = []
+
+        for item in package.items:
+            transformData += [item.getRelativeAttributes(rootTransform)]
+        
+        packageData += [{
+            "fileName" : package.getFileName(),
+            "transforms" : transformData
+        }]
+    
+    scene = {
+        "rootTransform" : rootTransform.attributes,
+        "packages" : packageData
+    }
+
+    sceneJson = json.dumps(scene, indent = 4)
+    with open(fullPath, 'w') as f:
+        f.write(sceneJson)
 
 def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
