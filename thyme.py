@@ -351,11 +351,10 @@ class clonesUI:
     def __str__(self):
         return self.name
 
-def exportCSV(folderPath):
+def exportCSV(fullPath):
     import csv
 
     global clones
-    fullPath = f"{folderPath}/{sourceObject}.csv"
 
     columns = ['name']
     columns += ['translate']
