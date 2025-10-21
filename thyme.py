@@ -48,12 +48,15 @@ class package:
         
         self.buttons = horizontalFormLayout(self, False)
         
-        self.openIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
-                                            i = 'outArrow.png', annotation = "Move to package editor")
+        self.openIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly', bgc = [0.32, 0.52, 0.65], ebg = False,
+                                            i = 'outArrow.png', annotation = "Move to package editor",
+                                            command = self.open)
         self.selectIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
-                                              i = 'selectBackFacingUV.png', annotation = "Select objects from this package")
+                                              i = 'selectBackFacingUV.png', annotation = "Select objects from this package",
+                                              command = self.select)
         self.deleteIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
-                                              i = 'deleteGeneric_100.png', annotation = "Delete this package")
+                                              i = 'deleteGeneric_100.png', annotation = "Delete this package",
+                                              command = self.delete)
         
         self.buttons.controls['left'] = [self.deleteIcon]
         self.buttons.controls['right'] = [self.openIcon, self.selectIcon]
@@ -64,8 +67,45 @@ class package:
                                       (self.buttons, 'right', 2),
                                       (self.buttons, 'bottom', 2)])
 
-    def updateUI(self):
+    def select(self, modifiers = True):
+        if (not modifiers):
+            cmds.select(self.items, replace = True)
+            return
+        
+        mods = getModifiers()
+        shift = mods.__contains__('Shift')
+        ctrl = mods.__contains__('Ctrl')
+
+        if (shift and ctrl):
+            cmds.select(self.items, add = True)
+        elif(shift):
+            cmds.select(self.items, toggle = True)
+        elif(ctrl):
+            cmds.select(self.items, deselect = True)
+        else:
+            cmds.select(self.items, replace = True)
+
+    def delete(self):
+        global packManagerPane
+        packManagerPane.removePackage(self)
+
+    def open(self):
+        global currentPackage
+        if (currentPackage == self):
+            return
+        
+        global packManagerPane
+        packManagerPane.setCurrentPackage(self)
+
+    def updateUI(self, isCurrent):
         cmds.text(self.itemCount, edit = True, label = f"{len(self.items)} Item(s)")
+
+        if (isCurrent):
+            cmds.iconTextButton(self.openIcon, edit = True, ebg = True,
+                                annotation = "Currently in package editor")
+        else:
+            cmds.iconTextButton(self.openIcon, edit = True, ebg = False,
+                                annotation = "Move to package editor")
 
     def __str__(self):
         return self.name
@@ -119,7 +159,7 @@ class transform:
             return self.name == value
         pass
 
-def packageManagerUI():
+def packageExporterUI():
     topBottomPanes = cmds.paneLayout(configuration = 'horizontal2')
     leftRightPanes = cmds.paneLayout(configuration = 'vertical2', p = topBottomPanes)
 
@@ -205,23 +245,56 @@ class packManagerUI:
                                     (self.title, 'top', 2),
                                     (self.title, 'right', rOffset)])
         
+        self.buttons = horizontalFormLayout(self, ebg = False)
+        self.addIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
+                                           i = 'addCreateGeneric_100.png', annotation = "Add empty package",
+                                           command = self.addPackage)
+        self.buttons.controls['left'] = [self.addIcon]
+        self.buttons.updateLayout(0, 2)
+
+        cmds.formLayout(self, edit = True,
+                        attachForm = [(self.buttons, 'left', lOffset),
+                                      (self.buttons, 'right', rOffset)],
+                        attachControl = [(self.buttons, 'top', 0, self.title)])
+
         self.scrollLayout = cmds.scrollLayout(p = self, childResizable = True, bgc = bgColor(-0.1))
-        self.packageList = verticalFormLayout(self.scrollLayout, False, h = 100)
+        self.packageList = verticalFormLayout(self.scrollLayout, False, h = 600)
 
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.scrollLayout, 'left', lOffset),
                                       (self.scrollLayout, 'right', rOffset),
                                       (self.scrollLayout, 'bottom', 2)],
-                        attachControl = [(self.scrollLayout, 'top', 4, self.title)])
+                        attachControl = [(self.scrollLayout, 'top', 0, self.buttons)])
         
+        self.setCurrentPackage(self.addPackage())
+
+    def setCurrentPackage(self, pack):
         global currentPackage
-        currentPackage = self.addPackage()
+
+        if (currentPackage):
+            currentPackage.updateUI(False)
+        
+        currentPackage = pack
+        currentPackage.updateUI(True)
+        
+        global packEditorPane
+        if (packEditorPane):
+            packEditorPane.updateItemsList()
+
+    def removePackage(self, pack):
+        self.packageList.controls['top'].remove(pack)
+        self.packageList.updateLayout(yOffset = 4, h = 54 * len(self.packageList.controls['top']))
+
+        if (len(self.packageList.controls['top']) <= 0):
+            self.setCurrentPackage(self.addPackage())
+        else:
+            self.setCurrentPackage(self.packageList.controls['top'][0])
 
     def addPackage(self):
         new = package(self.packageList)
 
         self.packageList.controls['top'] += [new]
-        self.packageList.updateLayout()
+        self.packageList.updateLayout(yOffset = 4, h = 54 * len(self.packageList.controls['top']))
 
         return new
 
@@ -240,7 +313,8 @@ class packEditorUI:
         
         self.buttons = horizontalFormLayout(self, ebg = False)
 
-        self.itemsList = cmds.textScrollList(p = self, allowMultiSelection = True)
+        self.itemsList = cmds.textScrollList(p = self, allowMultiSelection = True,
+                                             emptyLabel = "No items in the current package\n\nUse the buttons above to add/manage items")
         
         self.deleteIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
                             i = 'deleteGeneric_100.png', annotation = "Delete items selected in this list",
@@ -317,7 +391,7 @@ class packEditorUI:
     def updateItemsList(self):
         cmds.textScrollList(self.itemsList, edit = True, removeAll = True)
         cmds.textScrollList(self.itemsList, edit = True, append = sorted(currentPackage.items, key = lambda t: t.name))
-        currentPackage.updateUI()
+        currentPackage.updateUI(True)
 
     def __str__(self):
         return self.name
@@ -418,7 +492,7 @@ def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
             cmds.workspaceControl(windowName, edit=True, close = True)
 
-    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "packageManagerUI()",
+    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "packageExporterUI()",
                           mw = 500, mh = 600, label = "Package Exporter")
 
-createWorkspaceControl("packageManagerWindow")
+createWorkspaceControl("packageExporterWindow")
