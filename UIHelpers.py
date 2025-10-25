@@ -132,7 +132,8 @@ class directoryField:
 
         self.label = cmds.text("Path:", parent = self, align = 'left')
         self.field = cmds.textField(parent = self, placeholderText = "Choose an export directory",
-                                    annotation = "Path to where the file(s) will be saved")
+                                    annotation = "Path to where the file(s) will be saved",
+                                    tcc = self.changeCommand)
         self.button = cmds.symbolButton(parent = self, image = 'browseFolder_100.png',
                                         annotation = "Browse directory",
                                         command = lambda _: self.browseDir())
@@ -144,7 +145,15 @@ class directoryField:
                                       (self.field, 'top', 0), (self.field, 'bottom', 0),
                                       (self.button, 'top', 0), (self.button, 'bottom', 0)],
                         attachControl = [(self.field, 'left', 2, self.label), (self.field, 'right', 2, self.button)])
-        
+    
+    def changeCommand(self, *args):
+        import re
+
+        raw = cmds.textField(self.field, query = True, text = True)
+        self.directory = re.sub(r'[*?"<>|]+', '', raw)
+
+        cmds.textField(self.field, edit = True, text = self.directory)
+
     def browseDir(self):
         directory = cmds.fileDialog2(fileMode = 3)
         if (directory):

@@ -32,7 +32,7 @@ syncSelectEnabled = False
 class package:
     def __init__(self, parent):
         self.name = cmds.formLayout(p = parent, ebg = True, bgc = bgColor(),
-                                    nd = 100, w = 100, h = 50)
+                                    nd = 100, w = 10, h = 50)
         
         self.items = []
 
@@ -168,43 +168,55 @@ class transform:
             return self.name == value
         pass
 
-def packageExporterUI():
-    topBottomPanes = cmds.paneLayout(configuration = 'horizontal2')
-    leftRightPanes = cmds.paneLayout(configuration = 'vertical2', p = topBottomPanes)
-
-    global settingsPane
-    global packManagerPane
-    global packEditorPane
-
-    settingsPane = settingsUI(topBottomPanes)
-    packManagerPane = packManagerUI(leftRightPanes)
-    packEditorPane = packEditorUI(leftRightPanes)
-
-    cmds.paneLayout(topBottomPanes, edit = True, paneSize = [2, 100, 10])
-
 class settingsUI:
     def __init__(self, parent, lOffset = 2, rOffset = 2):
-        self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 160)
-        self.title = cmds.frameLayout(p = self, label = "Export Settings", collapsable = False)
+        self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 120)
+        self.title = cmds.frameLayout(p = self, label = "Export Settings", collapsable = True, collapse = False)
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.title, 'left', lOffset),
                                     (self.title, 'top', 2),
                                     (self.title, 'right', rOffset)])
         
-        self.setButton = cmds.button(p = self, label = "Use Selected Object", h = 25, w = 120,
+        self.scroll = cmds.scrollLayout(p = self.title, childResizable = True, h = 1)
+        self.collapse = cmds.formLayout(p = self.scroll, ebg = False, nd = 100, w = 100)
+        
+        extraOffset = 4
+        
+        # Export Toggles
+
+        self.jsonToggle = cmds.checkBox(p = self.collapse, label = "Export JSON scene", value = True,
+                                       changeCommand = lambda _: self.onJSONToggle())
+        self.fbxToggle = cmds.checkBox(p = self.collapse, label = "Export FBX meshes", value = True,
+                                       changeCommand = lambda _: self.onFBXToggle())
+
+        cmds.formLayout(self.collapse, edit = True,
+                        attachForm = [(self.jsonToggle, 'left', lOffset + extraOffset * 3),
+                                      (self.fbxToggle, 'right', lOffset + extraOffset * 3),
+                                      (self.fbxToggle, 'top', 2), (self.jsonToggle, 'top', 2)])
+
+        # Root Transform field
+        self.rootSetButton = cmds.button(p = self.collapse, label = "Use Selected Object", h = 25, w = 120,
                                     command = lambda _: self.setRootToSelected(),
                                     annotation = "Set the root transform to currently selected object")
-        self.nameField = cmds.textField(p = self, bgc = bgColor(-0.1), editable = False,
+        self.rootNameField = cmds.textField(p = self.collapse, bgc = bgColor(-0.1), editable = False,
                                         text = "No root transform set", h = 25)
-        cmds.formLayout(self, edit = True,
-                        attachForm = [(self.nameField, 'left', lOffset),
-                                    (self.setButton, 'right', rOffset)],
-                        attachControl = [(self.nameField, 'top', 4, self.title),
-                                        (self.setButton, 'top', 4, self.title),
-                                        (self.nameField, 'right', 4, self.setButton)])
-        
-        self.exportButton = cmds.button(p = self, h = 30, label = "Export",
-                                        command = lambda _: exportToJSON(f"{self.dirField.directory}/{self.fileName.text}.json"))
+        cmds.formLayout(self.collapse, edit = True,
+                        attachForm = [(self.rootNameField, 'left', lOffset + extraOffset),
+                                     (self.rootSetButton, 'right', rOffset + extraOffset)],
+                        attachControl = [(self.rootNameField, 'right', 4, self.rootSetButton),
+                                         (self.rootNameField, 'top', 4, self.fbxToggle),
+                                         (self.rootSetButton, 'top', 4, self.fbxToggle)])
+
+        # FBX Settings Frame
+        self.fbxSettings = self.fbxSettingsLayout(self.collapse)
+        cmds.formLayout(self.collapse, edit = True,
+                        attachForm = [(self.fbxSettings, 'left', lOffset),
+                                     (self.fbxSettings, 'right', rOffset)],
+                        attachControl = [(self.fbxSettings, 'top', 4, self.rootNameField)])
+
+        # Bottom Controls
+        self.exportButton = cmds.button(p = self, h = 30, label = "Export FBX and JSON",
+                                        command = lambda _: export())
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.exportButton, 'left', lOffset),
                                       (self.exportButton, 'right', rOffset),
@@ -220,22 +232,57 @@ class settingsUI:
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.dirField, 'left', lOffset),
                                       (self.dirField, 'right', rOffset)],
-                        attachControl = [(self.dirField, 'bottom', 4, self.fileName)])
+                        attachControl = [(self.dirField, 'bottom', 4, self.fileName),
+                                         (self.title, 'bottom', 4, self.dirField)])
+
+    def onFBXToggle(self):
+        v = cmds.checkBox(self.fbxToggle, query = True, value = True)
+
+        cmds.frameLayout(self.fbxSettings, edit = True, enable = v)
+
+        self.onToggle()
+
+    def onJSONToggle(self):
+        v = cmds.checkBox(self.jsonToggle, query = True, value = True)
+
+        cmds.button(self.rootSetButton, edit = True, enable = v)
+        cmds.textField(self.rootNameField, edit = True, enable = v,
+                       bgc = bgColor(-0.1))
+        
+        self.onToggle()
+
+    def onToggle(self):
+        fbxEnabled = cmds.checkBox(self.fbxToggle, query = True, value = True)
+        jsonEnabled = cmds.checkBox(self.jsonToggle, query = True, value = True)
+
+        if (fbxEnabled and jsonEnabled):
+            cmds.button(self.exportButton, edit = True, enable = True,
+                        label = "Export FBX and JSON")
+        elif(fbxEnabled):
+            cmds.button(self.exportButton, edit = True, enable = True,
+                        label = "Export FBX")
+        elif(jsonEnabled):
+            cmds.button(self.exportButton, edit = True, enable = True,
+                        label = "Export JSON")
+        else:
+            cmds.button(self.exportButton, edit = True, enable = False,
+                        label = "Export")
 
     def setRootToSelected(self):
         selection = cmds.ls(selection = True, type = 'transform')
         if (len(selection) != 1):
-            print("Must have only one object selected to set the root transform.")
+            cmds.confirmDialog(title = 'Root transform not set', button = ['Ok'], icon = 'critical', message = "" \
+            "You must have only one object selected in the scene to set the root transform.")
             return
 
         global rootTransform
         global packEditorPane
         
         rootTransform = transform(selection[0])
-        self.updateRootTransform(selection)
+        self.updateRootTransformUI(selection)
 
-    def updateRootTransform(self, selection):
-        cmds.textField(self.nameField, edit = True, text = selection[0])
+    def updateRootTransformUI(self, selection):
+        cmds.textField(self.rootNameField, edit = True, text = selection[0])
 
     def __str__(self):
         return self.name
@@ -245,9 +292,49 @@ class settingsUI:
             return self.name == value
         pass
 
+    class fbxSettingsLayout():
+        class fbxCheckbox:
+            def __init__(self, parent, label, defaultValue, fbxproperty):
+                self.name = cmds.checkBox(p = parent, l = label, v = defaultValue,
+                                        changeCommand = lambda _: self.onUIChanged())
+                self.fbxproperty = fbxproperty
+                self.value = defaultValue
+            
+            def onUIChanged(self):
+                self.value = cmds.checkBox(self, query = True, value = True)
+            
+            def sendProperty(self):
+                cmds.FBXProperty(self.fbxproperty, '-v', int(self.value))
+
+            def __str__(self):
+                return self.name
+
+        def __init__(self, parent):
+            self.name = cmds.frameLayout(p = parent, label = "FBX Settings", collapsable = True, collapse = True)
+
+            self.vForm = verticalFormLayout(parent = self, ebg = False)
+
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Smoothing Groups", True, 'Export|IncludeGrp|Geometry|SmoothingGroups')]
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Smooth Mesh", True, 'Export|IncludeGrp|Geometry|SmoothMesh')]
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Split Vertex Normals", False, 'Export|IncludeGrp|Geometry|expHardEdges')]
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Triangulate", False, 'Export|IncludeGrp|Geometry|Triangulate')]
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Tangents & Binormals", False, 'Export|IncludeGrp|Geometry|TangentsandBinormals')]
+
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Skinning", True, 'Export|IncludeGrp|Animation|Deformation|Skins')]
+            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Blendshapes", True, 'Export|IncludeGrp|Animation|Deformation|Shape')]
+
+            self.vForm.updateLayout(xOffset = 12)
+
+        def sendProperties(self):
+            for checkbox in self.vForm.controls['top']:
+                checkbox.sendProperty()
+        
+        def __str__(self):
+            return self.name
+
 class packManagerUI:
     def __init__(self, parent, lOffset = 2, rOffset = 0):
-        self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 80)
+        self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 50)
 
         self.title = cmds.frameLayout(p = self, label = "Package Manager", collapsable = False)
         cmds.formLayout(self, edit = True,
@@ -267,8 +354,9 @@ class packManagerUI:
                                       (self.buttons, 'right', rOffset)],
                         attachControl = [(self.buttons, 'top', 0, self.title)])
 
-        self.scrollLayout = cmds.scrollLayout(p = self, childResizable = True, bgc = bgColor(-0.1))
-        self.packageList = verticalFormLayout(self.scrollLayout, False, h = 600)
+        self.scrollLayout = cmds.scrollLayout(p = self, childResizable = True, bgc = bgColor(-0.1),
+                                              w = 10, h = 1)
+        self.packageList = verticalFormLayout(self.scrollLayout, False, w = 10, h = 600)
 
         cmds.formLayout(self, edit = True,
                         attachForm = [(self.scrollLayout, 'left', lOffset),
@@ -313,7 +401,7 @@ class packManagerUI:
 
 class packEditorUI:
     def __init__(self, parent, lOffset = 0, rOffset = 2):
-        self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 80)
+        self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 50)
         
         self.title = cmds.frameLayout(p = self, label = "Package Editor", collapsable = False)
         cmds.formLayout(self, edit = True,
@@ -498,22 +586,154 @@ class packEditorUI:
         def __str__(self):
             return self.name
 
-def exportToJSON(fullPath):
-    import json
-    packageData = []
+def packageExporterUI():
+    topBottomPanes = cmds.paneLayout(configuration = 'horizontal2')
+    leftRightPanes = cmds.paneLayout(configuration = 'vertical2', p = topBottomPanes)
+
+    global settingsPane
+    global packManagerPane
+    global packEditorPane
+
+    settingsPane = settingsUI(topBottomPanes)
+    packManagerPane = packManagerUI(leftRightPanes)
+    packEditorPane = packEditorUI(leftRightPanes)
+
+    cmds.paneLayout(topBottomPanes, edit = True, paneSize = [2, 100, 10])
+
+def export():
+    global settingsPane
+    fbxEnabled = cmds.checkBox(settingsPane.fbxToggle, query = True, value = True)
+    jsonEnabled = cmds.checkBox(settingsPane.jsonToggle, query = True, value = True)
+
+    if (not fbxEnabled and not jsonEnabled):
+        return
     
     global packManagerPane
-    for package in packManagerPane.packageList.controls['top']:
-        transformData = []
+    namesList = []
+    hasEmptyNames = False
+    hasEmptyPackages = False
 
-        for item in package.items:
-            transformData += [item.getRelativeAttributes(rootTransform)]
+    for pack in packManagerPane.packageList.controls['top']:
+        fileName = pack.getFileName()
+
+        if (fileName == ""):
+            hasEmptyNames = True
         
+        if (len(pack.items) <= 0):
+            hasEmptyPackages = True
+
+        namesList += [fileName]
+
+    if (settingsPane.fileName.text == ""):
+        cmds.confirmDialog(title = 'Invalid filename', button = ['Ok'], icon = 'critical',
+                           message = 'Please enter a valid filename.')
+        return
+
+    import os
+    if (not os.path.isdir(settingsPane.dirField.directory)):
+        cmds.confirmDialog(title = 'Invalid export directory', button = ['Ok'], icon = 'critical',
+                           message = f"Path \"{settingsPane.dirField.directory}\"" \
+        "\nis invalid or does not exist.\n\nPlease enter a valid path.")
+        return
+
+    if (len(namesList) != len(set(namesList))):
+        cmds.confirmDialog(title = 'Error', button = ['Ok'], icon = 'critical', message = "" \
+        "You have one or more packages with the same name.\n\nPlease rename the packages and try again.")
+        return
+
+    if (hasEmptyPackages):
+        response = cmds.confirmDialog(title = 'Warning', button = ['Continue','Cancel'],
+                           defaultButton = 'Cancel', cancelButton = 'Cancel',
+                           dismissString = 'Cancel', icon = 'warning', message = "" \
+        "You have one or more packages with no items.\n\nThese will not be exported.")
+
+        if (response == 'Cancel'):
+            return
+
+    if (hasEmptyNames):
+        response = cmds.confirmDialog(title = 'Warning', button = ['Continue','Cancel'],
+                           defaultButton = 'Cancel', cancelButton = 'Cancel',
+                           dismissString = 'Cancel', icon = 'warning', message = "" \
+        "You have one or more packages with no filename." \
+        "\n\nThese will not be exported.")
+
+        if (response == 'Cancel'):
+            return
+
+    global rootTransform
+    if (jsonEnabled and rootTransform == None):
+        response = cmds.confirmDialog(title = 'Warning', button = ['Continue','Cancel'],
+                           defaultButton = 'Cancel', cancelButton = 'Cancel',
+                           dismissString = 'Cancel', icon = 'warning', message = "" \
+        "The root transform has not been set." \
+        "\n\nThis may cause issues when loading the JSON scene somewhere else.")
+
+        if (response == 'Cancel'):
+            return
+
+    if (fbxEnabled):
+        exportFBX()
+    if (jsonEnabled):
+        exportJSON()
+
+def exportFBX():
+    global settingsPane
+    settingsPane.fbxSettings.sendProperties()
+
+    print(f"Starting FBX Export to {settingsPane.dirField.directory}...")
+
+    global packManagerPane
+    for pack in packManagerPane.packageList.controls['top']:
+        fileName = pack.getFileName()
+
+        if (len(pack.items) <= 0):
+            print(f"No items in {fileName} package, skipping...")
+            continue
+
+        pack.select(False) # Select w/o modifiers so holding Shift + export doesn't break things
+
+        if (fileName == ""):
+            print("Skipped exporting package due to empty filename")
+            continue
+
+        directory = f"{settingsPane.dirField.directory}/{fileName}.fbx"
+
+        print(f"Exporting {fileName} package to {directory}")
+        # -s makes it export selected instead of export all
+        cmds.FBXExport("-file", directory, "-s")
+
+    print(f"Finished FBX Export to {settingsPane.dirField.directory}.")
+
+def exportJSON():
+    global settingsPane
+    fullPath = f"{settingsPane.dirField.directory}/{settingsPane.fileName.text}.json"
+
+    print(f"Starting JSON Export to {fullPath}...")
+
+    import json
+    packageData = []
+
+    global packManagerPane
+    for pack in packManagerPane.packageList.controls['top']:
+        transformData = []
+        fileName = pack.getFileName()
+
+        if (len(pack.items) <= 0):
+            print(f"No items in {fileName} package. It will be left out of the scene JSON.")
+            continue
+
+        if (fileName == ""):
+            print(f"Package is missing a filename. It will be left out of the scene JSON.")
+            continue
+
+        for item in pack.items:
+            transformData += [item.getRelativeAttributes(rootTransform)]
+
         packageData += [{
-            "fileName" : package.getFileName(),
+            "fileName" : fileName,
             "transforms" : transformData
         }]
-    
+
     scene = {
         "rootTransform" : rootTransform.attributes,
         "packages" : packageData
@@ -523,11 +743,13 @@ def exportToJSON(fullPath):
     with open(fullPath, 'w') as f:
         f.write(sceneJson)
 
+    print(f"Finished JSON Export to {fullPath}...")
+
 def createWorkspaceControl(windowName):
     if (cmds.workspaceControl(windowName, exists = True)):
             cmds.workspaceControl(windowName, edit=True, close = True)
 
     cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "packageExporterUI()",
-                          mw = 500, mh = 600, label = "Package Exporter")
+                          mw = 290, mh = 250, label = "Package Exporter")
 
 createWorkspaceControl("packageExporterWindow")
