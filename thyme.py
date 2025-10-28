@@ -29,6 +29,21 @@ packEditorPane = None
 global syncSelectEnabled
 syncSelectEnabled = False
 
+def getSelection():
+    root = cmds.ls(selection = True, type = 'transform', long = True)
+    relatives = cmds.listRelatives(root, allDescendents = True, type = 'mesh', fullPath = True)
+    selected = []
+
+    if (relatives != None):
+        for shape in relatives:
+            transform = cmds.listRelatives(shape, parent = True, fullPath = True)
+            if transform != None:
+                selected += transform
+    else:
+        selected = root
+
+    return selected
+
 class package:
     def __init__(self, parent):
         self.name = cmds.formLayout(p = parent, ebg = True, bgc = bgColor(),
@@ -269,7 +284,7 @@ class settingsUI:
                         label = "Export")
 
     def setRootToSelected(self):
-        selection = cmds.ls(selection = True, type = 'transform')
+        selection = getSelection()
         if (len(selection) != 1):
             cmds.confirmDialog(title = 'Root transform not set', button = ['Ok'], icon = 'critical', message = "" \
             "You must have only one object selected in the scene to set the root transform.")
@@ -463,7 +478,7 @@ class packEditorUI:
         self.updateItemsList()
 
     def addSelection(self):
-        selection = cmds.ls(selection = True, type = 'transform')
+        selection = getSelection()
         if (len(selection) <= 0):
             print("No objects selected.")
             return
@@ -541,7 +556,7 @@ class packEditorUI:
             
         def quickSyncSelection(self):
             listSelection = cmds.textScrollList(self.itemsList, query = True, selectItem = True)
-            sceneSelection = cmds.ls(selection = True, type = 'transform')
+            sceneSelection = getSelection()
             
             cmds.textScrollList(self.itemsList, edit = True, deselectAll = True)
             
@@ -559,7 +574,7 @@ class packEditorUI:
             if (not syncSelectEnabled and not force):
                 return
 
-            selection = cmds.ls(selection = True, type = 'transform')
+            selection = getSelection()
             cmds.textScrollList(self.itemsList, edit = True, deselectAll = True)
 
             if (len(selection) <= 0):
