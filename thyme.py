@@ -1,5 +1,4 @@
 import maya.cmds as cmds
-import maya.mel as mel
 from UIHelpers import *
 
 # add icon = addCreateGeneric_100.png
@@ -57,6 +56,7 @@ def autoGeneratePackages(*args):
     allShapes = cmds.filterExpand(allTransforms, fullPath = True, selectionMask = 12)
 
     # initialise progress bar
+    import maya.mel as mel
     gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
     cmds.progressBar(gMainProgressBar, edit = True, beginProgress = True,
                      isInterruptable = True, status = 'Auto-generating packages...',
@@ -115,42 +115,63 @@ def getSelection():
     return transforms
 
 class package:
+    foldedHeight = 36
+    expandedHeight = 72
+
     def __init__(self, parent):
         self.name = cmds.formLayout(p = parent, ebg = True, bgc = bgColor(),
-                                    nd = 100, w = 10, h = 50)
+                                    nd = 100, w = 10, h = package.foldedHeight)
         
         self.items = []
-
-        self.nameField = fileNameField(self)
-        self.itemCount = cmds.text(p = self, align = 'left', label = f"{len(self.items)} Item(s)")
-        cmds.formLayout(self, edit = True, 
-                        attachForm = [(self.nameField, 'top', 2),
-                                      (self.nameField, 'left', 2),
-                                      (self.itemCount, 'top', 4),
-                                      (self.itemCount, 'right', 4)],
-                        attachPosition = [(self.nameField, 'right', 0, 75),
-                                          (self.itemCount, 'left', 4, 75)])
+        self.customPathEnabled = False
         
-        self.buttons = horizontalFormLayout(self, False)
+        self.topLayout = horizontalFormLayout(self, False)
         
-        self.openIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly', bgc = [0.32, 0.52, 0.65], ebg = False,
+        self.openIcon = cmds.iconTextButton(p = self.topLayout, style = 'iconOnly', bgc = [0.32, 0.52, 0.65], ebg = False,
                                             i = 'outArrow.png', annotation = "Move to package editor",
                                             command = self.open)
-        self.selectIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
+        self.pathIcon = cmds.iconTextButton(p = self.topLayout, style = 'iconOnly', bgc = [0.32, 0.52, 0.65], ebg = False,
+                                            i = 'folder-new.png', annotation = "Enable custom export path",
+                                            command = self.toggleCustomPath)
+        self.selectIcon = cmds.iconTextButton(p = self.topLayout, style = 'iconOnly',
                                               i = 'selectBackFacingUV.png', annotation = "Select objects from this package",
                                               command = self.select)
-        self.deleteIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
+        self.deleteIcon = cmds.iconTextButton(p = self.topLayout, style = 'iconOnly',
                                               i = 'deleteGeneric_100.png', annotation = "Delete this package",
-                                              command = self.delete)
+                                              command = self.delete, w = 28)
+        self.nameField = fileNameField(self.topLayout)
+        self.itemCount = cmds.text(p = self.topLayout, align = 'center', label = f"{len(self.items)} Item(s)", w = 50)
         
-        self.buttons.controls['left'] = [self.deleteIcon]
-        self.buttons.controls['right'] = [self.openIcon, self.selectIcon]
-        self.buttons.updateLayout(0, 0)
+        self.topLayout.controls['left'] = [self.deleteIcon, self.nameField]
+        self.topLayout.controls['right'] = [self.openIcon, self.pathIcon, self.selectIcon, self.itemCount, self.nameField]
+        self.topLayout.updateLayout(2, 0)
 
         cmds.formLayout(self, edit = True,
-                        attachForm = [(self.buttons, 'left', 2),
-                                      (self.buttons, 'right', 2),
-                                      (self.buttons, 'bottom', 2)])
+                        attachForm = [(self.topLayout, 'left', 0),
+                                      (self.topLayout, 'right', 0),
+                                      (self.topLayout, 'top', 6)])
+        
+        self.dirField = directoryField(self)
+        cmds.formLayout(self.dirField, edit = True, visible = False)
+
+        cmds.formLayout(self, edit = True,
+                        attachForm = [(self.dirField, 'left', 4),
+                                      (self.dirField, 'right', 2),
+                                      (self.dirField, 'bottom', 6)])
+
+    def toggleCustomPath(self):
+        if (self.customPathEnabled):
+            cmds.iconTextButton(self.pathIcon, edit = True, ebg = False)
+            self.customPathEnabled = False
+
+            cmds.formLayout(self, edit = True, h = package.foldedHeight)
+            cmds.formLayout(self.dirField, edit = True, visible = False)
+        else:
+            cmds.iconTextButton(self.pathIcon, edit = True, ebg = True)
+            self.customPathEnabled = True
+
+            cmds.formLayout(self, edit = True, h = package.expandedHeight)
+            cmds.formLayout(self.dirField, edit = True, visible = True)
 
     def select(self, modifiers = True):
         if (not modifiers):
@@ -473,14 +494,14 @@ class packManagerUI:
         if (len(self.packageList.controls['top']) <= 0):
             self.setCurrentPackage(self.addPackage())
         else:
-            self.packageList.updateLayout(yOffset = 4, h = 54 * len(self.packageList.controls['top']))
+            self.packageList.updateLayout(yOffset = 4, h = (package.expandedHeight + 4) * len(self.packageList.controls['top']))
             self.setCurrentPackage(self.packageList.controls['top'][0])
 
     def addPackage(self):
         new = package(self.packageList)
 
         self.packageList.controls['top'] += [new]
-        self.packageList.updateLayout(yOffset = 4, h = 54 * len(self.packageList.controls['top']))
+        self.packageList.updateLayout(yOffset = 4, h = (package.expandedHeight + 4) * len(self.packageList.controls['top']))
 
         return new
 
@@ -705,6 +726,8 @@ def export():
     hasEmptyNames = False
     hasEmptyPackages = False
 
+    import os
+
     for pack in packManagerPane.packageList.controls['top']:
         fileName = pack.getFileName()
 
@@ -714,18 +737,24 @@ def export():
         if (len(pack.items) <= 0):
             hasEmptyPackages = True
 
+        if (pack.customPathEnabled):
+            if (not os.path.isdir(pack.dirField.directory)):
+                cmds.confirmDialog(title = 'Invalid export directory', button = ['Ok'], icon = 'critical',
+                           message = f"Path \"{pack.dirField.directory}\" on package \"{fileName}\"" \
+                "\nis invalid or does not exist.\n\nPlease enter a valid path and try again.")
+                return
+
         namesList += [fileName]
 
     if (settingsPane.fileName.text == ""):
         cmds.confirmDialog(title = 'Invalid filename', button = ['Ok'], icon = 'critical',
-                           message = 'Please enter a valid filename.')
+                           message = 'Please enter a valid filename and try again.')
         return
 
-    import os
     if (not os.path.isdir(settingsPane.dirField.directory)):
         cmds.confirmDialog(title = 'Invalid export directory', button = ['Ok'], icon = 'critical',
                            message = f"Path \"{settingsPane.dirField.directory}\"" \
-        "\nis invalid or does not exist.\n\nPlease enter a valid path.")
+        "\nis invalid or does not exist.\n\nPlease enter a valid path and try again.")
         return
 
     if (len(namesList) != len(set(namesList))):
@@ -782,13 +811,16 @@ def exportFBX():
             print(f"No items in {fileName} package, skipping...")
             continue
 
-        pack.select(False) # Select w/o modifiers so holding Shift + export doesn't break things
+        cmds.select(pack.items[0], replace = True)
 
         if (fileName == ""):
             print("Skipped exporting package due to empty filename")
             continue
 
-        directory = f"{settingsPane.dirField.directory}/{fileName}.fbx"
+        if (pack.customPathEnabled):
+            directory = f"{pack.dirField.directory}/{fileName}.fbx"
+        else:
+            directory = f"{settingsPane.dirField.directory}/{fileName}.fbx"
 
         print(f"Exporting {fileName} package to {directory}")
         # -s makes it export selected instead of export all
@@ -821,9 +853,14 @@ def exportJSON():
         for item in pack.items:
             transformData += [item.getRelativeAttributes(rootTransform)]
 
+        filePath = f"{settingsPane.dirField.directory}/{fileName}"
+        if (pack.customPathEnabled):
+            filePath = f"{pack.dirField.directory}/{fileName}"
+
         packageData += [{
             "fileName" : fileName,
-            "transforms" : transformData
+            "transforms" : transformData,
+            "path" : filePath
         }]
 
     scene = {
