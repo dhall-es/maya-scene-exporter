@@ -1,4 +1,5 @@
 import maya.cmds as cmds
+import maya.mel as mel
 from UIHelpers import *
 
 # add icon = addCreateGeneric_100.png
@@ -34,6 +35,7 @@ def autoGeneratePackages(*args):
     global packManagerPane
     global packEditorPane
 
+    # warning dialog
     if (len(packManagerPane.packageList.controls['top']) > 1 or len(currentPackage.items) > 0):
         response = cmds.confirmDialog(title = 'Are you sure?', button = ['Continue','Cancel'],
                            defaultButton = 'Cancel', cancelButton = 'Cancel',
@@ -49,19 +51,34 @@ def autoGeneratePackages(*args):
     # turn off sync select
     packEditorPane.syncIcon.setSyncSelect(False)
 
-    allShapes = cmds.ls(long = True, type = 'mesh')
+    # get all transforms
+    allTransforms = cmds.ls(long = True, type = 'transform', visible = True)
+    # convert to shapes, so there's 1 shape per transform (there can be more than 1, which leads to duplicates in the package list)
+    allShapes = cmds.filterExpand(allTransforms, fullPath = True, selectionMask = 12)
+
+    # initialise progress bar
+    gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
+    cmds.progressBar(gMainProgressBar, edit = True, beginProgress = True,
+                     isInterruptable = True, status = 'Auto-generating packages...',
+                     maxValue = len(allShapes))
 
     for _ in range(len(allShapes)):
+        if (cmds.progressBar(gMainProgressBar, query = True, isCancelled = True)):
+            break
+        
         if (len(allShapes) <= 0):
             break
         packManagerPane.setCurrentPackage(packManagerPane.addPackage())
         
         # take a shape from the list and get its transform
         packageShapes = [allShapes.pop()]
+        cmds.progressBar(gMainProgressBar, edit = True, step = 1)
 
         # iterate through the rest of the list
         i = 0
         for _ in range(len(allShapes)):
+            if (cmds.progressBar(gMainProgressBar, query = True, isCancelled = True)):
+                break
             if (i >= len(allShapes)):
                 break
 
@@ -69,20 +86,27 @@ def autoGeneratePackages(*args):
 
             # if the shape is similar, add it to the package and remove it from the list
             if (similar):
-                packageShapes.append(allShapes.pop(i))
+                shape = allShapes.pop(i)
+                packageShapes.append(shape)
+                cmds.progressBar(gMainProgressBar, edit = True, step = 1)
             else:
-                # only increment i when a shape doesn't match, so we don't skip past things when removing items
+                # only increment i when a shape doesn't match, so we don't skip past things accidentally when removing items
                 i += 1
         
         # get transforms for package shapes
         for shapeTransform in cmds.listRelatives(packageShapes, parent = True, fullPath = True):
             currentPackage.items.append(transform(shapeTransform))
+        currentPackage.nameField.setName(str(currentPackage.items[0]))
 
     packEditorPane.updateItemsList()
+    cmds.progressBar(gMainProgressBar, edit = True, endProgress = True)
 
 def getSelection():
+    # root selection can be an object or a group
     root = cmds.ls(selection = True, type = 'transform', long = True)
+    # get all descendent meshes so groups aren't included
     relativeMeshes = cmds.listRelatives(root, allDescendents = True, type = 'mesh', fullPath = True)
+    # get the transforms of descendent shapes
     transforms = cmds.listRelatives(relativeMeshes, parent = True, fullPath = True)
 
     if (transforms == None):

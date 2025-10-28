@@ -23,6 +23,13 @@ class fileNameField:
         self.name = cmds.textField(p = parent, bgc = bgColor(-0.1), placeholderText = "filename", tcc = self.changeCommand)
         self.text = ""
     
+    def setName(self, value):
+        import re
+
+        self.text = re.sub(r'[\\/:*?"<>|]+', '', value)
+
+        cmds.textField(self, edit = True, text = self.text)
+
     def changeCommand(self, *args):
         import re
 
