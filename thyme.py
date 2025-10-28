@@ -29,20 +29,66 @@ packEditorPane = None
 global syncSelectEnabled
 syncSelectEnabled = False
 
+def autoGeneratePackages(*args):
+    global currentPackage
+    global packManagerPane
+    global packEditorPane
+
+    if (len(packManagerPane.packageList.controls['top']) > 1 or len(currentPackage.items) > 0):
+        response = cmds.confirmDialog(title = 'Are you sure?', button = ['Continue','Cancel'],
+                           defaultButton = 'Cancel', cancelButton = 'Cancel',
+                           dismissString = 'Cancel', icon = 'warning', message = "" \
+        "Auto-generating packages will clear the list of packages.")
+
+        if (response == 'Cancel'):
+            return
+
+    # clear packages
+    packManagerPane.packageList.controls['top'] = []
+
+    # turn off sync select
+    packEditorPane.syncIcon.setSyncSelect(False)
+
+    allShapes = cmds.ls(long = True, type = 'mesh')
+
+    for _ in range(len(allShapes)):
+        if (len(allShapes) <= 0):
+            break
+        packManagerPane.setCurrentPackage(packManagerPane.addPackage())
+        
+        # take a shape from the list and get its transform
+        packageShapes = [allShapes.pop()]
+
+        # iterate through the rest of the list
+        i = 0
+        for _ in range(len(allShapes)):
+            if (i >= len(allShapes)):
+                break
+
+            similar = cmds.polyCompare(packageShapes[0], allShapes[i], faceDesc = True, uvSets = True) == 0
+
+            # if the shape is similar, add it to the package and remove it from the list
+            if (similar):
+                packageShapes.append(allShapes.pop(i))
+            else:
+                # only increment i when a shape doesn't match, so we don't skip past things when removing items
+                i += 1
+        
+        # get transforms for package shapes
+        for shapeTransform in cmds.listRelatives(packageShapes, parent = True, fullPath = True):
+            currentPackage.items.append(transform(shapeTransform))
+
+    packEditorPane.updateItemsList()
+
 def getSelection():
     root = cmds.ls(selection = True, type = 'transform', long = True)
-    relatives = cmds.listRelatives(root, allDescendents = True, type = 'mesh', fullPath = True)
-    selected = []
+    relativeMeshes = cmds.listRelatives(root, allDescendents = True, type = 'mesh', fullPath = True)
+    transforms = cmds.listRelatives(relativeMeshes, parent = True, fullPath = True)
 
-    if (relatives != None):
-        for shape in relatives:
-            transform = cmds.listRelatives(shape, parent = True, fullPath = True)
-            if transform != None:
-                selected += transform
-    else:
-        selected = root
+    if (transforms == None):
+        transforms = []
 
-    return selected
+    return transforms
 
 class package:
     def __init__(self, parent):
@@ -361,7 +407,10 @@ class packManagerUI:
         self.addIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
                                            i = 'addCreateGeneric_100.png', annotation = "Add empty package",
                                            command = self.addPackage)
+        self.autoPackageButton = cmds.button(p = self.buttons, label = "Auto-Generate packages", h = 25, w = 150,
+                                             command = autoGeneratePackages)
         self.buttons.controls['left'] = [self.addIcon]
+        self.buttons.controls['right'] = [self.autoPackageButton]
         self.buttons.updateLayout(0, 2)
 
         cmds.formLayout(self, edit = True,
@@ -396,11 +445,11 @@ class packManagerUI:
 
     def removePackage(self, pack):
         self.packageList.controls['top'].remove(pack)
-        self.packageList.updateLayout(yOffset = 4, h = 54 * len(self.packageList.controls['top']))
-
+        
         if (len(self.packageList.controls['top']) <= 0):
             self.setCurrentPackage(self.addPackage())
         else:
+            self.packageList.updateLayout(yOffset = 4, h = 54 * len(self.packageList.controls['top']))
             self.setCurrentPackage(self.packageList.controls['top'][0])
 
     def addPackage(self):
@@ -483,13 +532,9 @@ class packEditorUI:
             print("No objects selected.")
             return
 
-        global rootTransform
         global currentPackage
 
         for item in selection:
-            if (item == rootTransform):
-                continue
-
             if (item in currentPackage.items):
                 currentPackage.items[currentPackage.items.index(item)].update()
                 continue
@@ -539,13 +584,21 @@ class packEditorUI:
                 return
             
             global syncSelectEnabled
+            self.setSyncSelect(not syncSelectEnabled)
+        
+        def setSyncSelect(self, value):
+            global syncSelectEnabled
+            if (syncSelectEnabled == value):
+                return
 
+            # If setting to false and value is true
             if (syncSelectEnabled):
                 cmds.iconTextButton(self, edit = True, ebg = False)
                 syncSelectEnabled = False
                 cmds.scriptJob(kill = self.syncSelectJob)
                 return
             
+            # Else if setting to true and value is false
             cmds.iconTextButton(self, edit = True, ebg = True)
             syncSelectEnabled = True
 
@@ -553,7 +606,7 @@ class packEditorUI:
                                                 parent = self, compressUndo = True)
             
             self.quickSyncSelection()
-            
+
         def quickSyncSelection(self):
             listSelection = cmds.textScrollList(self.itemsList, query = True, selectItem = True)
             sceneSelection = getSelection()
