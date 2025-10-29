@@ -21,7 +21,7 @@ global settingsPane
 settingsPane = None
 
 global packManagerPane
-settingsPane = None
+packManagerPane = None
 
 global packEditorPane
 packEditorPane = None
@@ -33,19 +33,6 @@ def autoGeneratePackages(*args):
     global currentPackage
     global packManagerPane
     global packEditorPane
-
-    # warning dialog
-    if (len(packManagerPane.packageList.controls['top']) > 1 or len(currentPackage.items) > 0):
-        response = cmds.confirmDialog(title = 'Are you sure?', button = ['Continue','Cancel'],
-                           defaultButton = 'Cancel', cancelButton = 'Cancel',
-                           dismissString = 'Cancel', icon = 'warning', message = "" \
-        "Auto-generating packages will clear the list of packages.")
-
-        if (response == 'Cancel'):
-            return
-
-    # clear packages
-    packManagerPane.packageList.controls['top'] = []
 
     # turn off sync select
     packEditorPane.syncIcon.setSyncSelect(False)
@@ -98,7 +85,7 @@ def autoGeneratePackages(*args):
             currentPackage.items.append(transform(shapeTransform))
         currentPackage.nameField.setName(str(currentPackage.items[0]))
 
-    packEditorPane.updateItemsList()
+    packManagerPane.setCurrentPackage(packManagerPane.packageList.controls['top'][0])
     cmds.progressBar(gMainProgressBar, edit = True, endProgress = True)
 
 def getSelection():
@@ -194,7 +181,7 @@ class package:
     def delete(self):
         global packManagerPane
         packManagerPane.removePackage(self)
-
+        
     def open(self):
         global currentPackage
         if (currentPackage == self):
@@ -276,6 +263,7 @@ class transform:
 
 class settingsUI:
     def __init__(self, parent, lOffset = 2, rOffset = 2):
+        self.parent = parent
         self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 120)
         self.title = cmds.frameLayout(p = self, label = "Export Settings", collapsable = True, collapse = False)
         cmds.formLayout(self, edit = True,
@@ -385,6 +373,10 @@ class settingsUI:
         global packEditorPane
         
         rootTransform = transform(selection[0])
+
+        rootTransform.attributes['rotate'] = [0, 0, 0]
+        rootTransform.attributes['scale'] = [1, 1, 1]
+
         self.updateRootTransformUI(selection)
 
     def updateRootTransformUI(self, selection):
@@ -420,14 +412,14 @@ class settingsUI:
 
             self.vForm = verticalFormLayout(parent = self, ebg = False)
 
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Smoothing Groups", True, 'Export|IncludeGrp|Geometry|SmoothingGroups')]
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Smooth Mesh", True, 'Export|IncludeGrp|Geometry|SmoothMesh')]
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Split Vertex Normals", False, 'Export|IncludeGrp|Geometry|expHardEdges')]
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Triangulate", False, 'Export|IncludeGrp|Geometry|Triangulate')]
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Tangents & Binormals", False, 'Export|IncludeGrp|Geometry|TangentsandBinormals')]
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Smoothing Groups", True, 'Export|IncludeGrp|Geometry|SmoothingGroups'))
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Smooth Mesh", True, 'Export|IncludeGrp|Geometry|SmoothMesh'))
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Split Vertex Normals", False, 'Export|IncludeGrp|Geometry|expHardEdges'))
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Triangulate", False, 'Export|IncludeGrp|Geometry|Triangulate'))
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Tangents & Binormals", False, 'Export|IncludeGrp|Geometry|TangentsandBinormals'))
 
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Skinning", True, 'Export|IncludeGrp|Animation|Deformation|Skins')]
-            self.vForm.controls['top'] += [self.fbxCheckbox(self.vForm, "Blendshapes", True, 'Export|IncludeGrp|Animation|Deformation|Shape')]
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Skinning", True, 'Export|IncludeGrp|Animation|Deformation|Skins'))
+            self.vForm.controls['top'].append(self.fbxCheckbox(self.vForm, "Blendshapes", True, 'Export|IncludeGrp|Animation|Deformation|Shape'))
 
             self.vForm.updateLayout(xOffset = 12)
 
@@ -440,6 +432,7 @@ class settingsUI:
 
 class packManagerUI:
     def __init__(self, parent, lOffset = 2, rOffset = 0):
+        self.parent = parent
         self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 50)
 
         self.title = cmds.frameLayout(p = self, label = "Package Manager", collapsable = False)
@@ -489,7 +482,11 @@ class packManagerUI:
             packEditorPane.updateItemsList()
 
     def removePackage(self, pack):
+        print(f"Removing {pack.nameField.text}. Length = {len(self.packageList.controls['top'])}")
+
         self.packageList.controls['top'].remove(pack)
+        if (cmds.formLayout(pack, exists = True) and len(pack.items) > 0):
+            cmds.deleteUI(pack)
         
         if (len(self.packageList.controls['top']) <= 0):
             self.setCurrentPackage(self.addPackage())
@@ -500,7 +497,7 @@ class packManagerUI:
     def addPackage(self):
         new = package(self.packageList)
 
-        self.packageList.controls['top'] += [new]
+        self.packageList.controls['top'].append(new)
         self.packageList.updateLayout(yOffset = 4, h = (package.expandedHeight + 4) * len(self.packageList.controls['top']))
 
         return new
@@ -510,6 +507,7 @@ class packManagerUI:
 
 class packEditorUI:
     def __init__(self, parent, lOffset = 0, rOffset = 2):
+        self.parent = parent
         self.name = cmds.formLayout(p = parent, ebg = False, nd = 100, w = 100, h = 50)
         
         self.title = cmds.frameLayout(p = self, label = "Package Editor", collapsable = False)
@@ -584,7 +582,7 @@ class packEditorUI:
                 currentPackage.items[currentPackage.items.index(item)].update()
                 continue
             
-            currentPackage.items += [transform(item)]
+            currentPackage.items.append(transform(item))
 
         self.updateItemsList()
 
@@ -744,7 +742,7 @@ def export():
                 "\nis invalid or does not exist.\n\nPlease enter a valid path and try again.")
                 return
 
-        namesList += [fileName]
+        namesList.append(fileName)
 
     if (settingsPane.fileName.text == ""):
         cmds.confirmDialog(title = 'Invalid filename', button = ['Ok'], icon = 'critical',
@@ -811,7 +809,13 @@ def exportFBX():
             print(f"No items in {fileName} package, skipping...")
             continue
 
-        cmds.select(pack.items[0], replace = True)
+        # Duplicate object and reset transforms so offsets/rotation arent baked into the mesh
+        # This helps for instancing later
+        dupe = cmds.duplicate(pack.items[0])[0]
+        cmds.setAttr(f"{dupe}.translate", 0, 0, 0, type = 'double3')
+        cmds.setAttr(f"{dupe}.rotate", 0, 0, 0, type = 'double3')
+        cmds.setAttr(f"{dupe}.scale", 1, 1, 1, type = 'double3')
+        cmds.select(dupe, replace = True)
 
         if (fileName == ""):
             print("Skipped exporting package due to empty filename")
@@ -825,6 +829,9 @@ def exportFBX():
         print(f"Exporting {fileName} package to {directory}")
         # -s makes it export selected instead of export all
         cmds.FBXExport("-file", directory, "-s")
+        
+        # Delete duplicated object so the scene is as it was
+        cmds.delete(dupe)
 
     print(f"Finished FBX Export to {settingsPane.dirField.directory}.")
 
