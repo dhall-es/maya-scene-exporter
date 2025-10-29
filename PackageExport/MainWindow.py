@@ -244,6 +244,9 @@ class package:
         '''
         Update the package's UI for item count and whether it's opened in the package editor.
         '''
+        if (not cmds.formLayout(self, exists = True)):
+            return
+        
         cmds.text(self.itemCount, edit = True, label = f"{len(self.items)} Item(s)")
 
         if (isCurrent):
@@ -1094,11 +1097,27 @@ def exportJSON():
 
     print(f"Finished JSON Export to {fullPath}...")
 
-def createWorkspaceControl(windowName):
+def Create(windowName = "packageExporterWindow"):
+    global currentPackage
+    currentPackage = None
+
+    global rootTransform
+    rootTransform = None
+
+    global settingsPane
+    settingsPane = None
+
+    global packManagerPane
+    packManagerPane = None
+
+    global packEditorPane
+    packEditorPane = None
+
+    global syncSelectEnabled
+    syncSelectEnabled = False
     if (cmds.workspaceControl(windowName, exists = True)):
             cmds.workspaceControl(windowName, edit=True, close = True)
 
-    cmds.workspaceControl(windowName, retain = False, floating = True, uiScript = "packageExporterUI()",
+    cmds.workspaceControl(windowName, retain = False, floating = True,
                           mw = 290, mh = 250, label = "Package Exporter")
-
-createWorkspaceControl("packageExporterWindow")
+    packageExporterUI()
