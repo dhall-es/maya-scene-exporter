@@ -1,5 +1,5 @@
 import maya.cmds as cmds
-from UIHelpers import *
+from PackageExport.UIHelpers import *
 
 # add icon = addCreateGeneric_100.png
 # add icon = newLayerEmpty.png
