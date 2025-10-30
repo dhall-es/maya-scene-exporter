@@ -48,6 +48,9 @@ def autoGeneratePackages(*args):
     # convert to shapes, so there's 1 shape per transform (there can be more than 1, which leads to duplicates in the package list)
     allShapes = cmds.filterExpand(allTransforms, fullPath = True, selectionMask = 12)
 
+    if (allShapes == None):
+        return
+
     # Initialise progress bar. Progress is calculated based on the amount of shapes that have been checked in the scene.
     import maya.mel as mel
     gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
@@ -228,6 +231,8 @@ class package:
 
     # self.deleteIcon button command
     def delete(self):
+        cmds.deleteUI(self, layout = True)
+
         global packManagerPane
         packManagerPane.removePackage(self)
     
@@ -627,10 +632,6 @@ class packManagerUI:
         \nNote that there must always be at least one package, so this immediately creates a new one if the list is empty.
         '''
         self.packageList.controls['top'].remove(pack)
-
-        # fix packages lingering even when they're not in the list
-        if (cmds.formLayout(pack, exists = True) and len(pack.items) > 0):
-            cmds.deleteUI(pack)
         
         # select a new currentPackage so packEditor doesn't show information from the package we just deleted
         if (len(self.packageList.controls['top']) <= 0):
