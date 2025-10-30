@@ -48,6 +48,9 @@ def autoGeneratePackages(*args):
     # convert to shapes, so there's 1 shape per transform (there can be more than 1, which leads to duplicates in the package list)
     allShapes = cmds.filterExpand(allTransforms, fullPath = True, selectionMask = 12)
 
+    if (allShapes == None):
+        return
+
     # Initialise progress bar. Progress is calculated based on the amount of shapes that have been checked in the scene.
     import maya.mel as mel
     gMainProgressBar = mel.eval('$tmp = $gMainProgressBar')
@@ -61,9 +64,10 @@ def autoGeneratePackages(*args):
         
         if (len(allShapes) <= 0):
             break
+
         # Add new package
         packManagerPane.setCurrentPackage(packManagerPane.addPackage())
-        
+
         # Take a shape from the list to base the package off of
         packageShapes = [allShapes.pop()]
 
@@ -228,6 +232,8 @@ class package:
 
     # self.deleteIcon button command
     def delete(self):
+        cmds.deleteUI(self, layout = True)
+
         global packManagerPane
         packManagerPane.removePackage(self)
     
@@ -579,8 +585,11 @@ class packManagerUI:
                                            command = self.addPackage)
         self.autoPackageButton = cmds.button(p = self.buttons, label = "Auto-Generate packages", h = 25, w = 150,
                                              command = autoGeneratePackages)
+        self.deleteIcon = cmds.iconTextButton(p = self.buttons, style = 'iconOnly',
+                                              i = 'deleteGeneric_100.png', annotation = "Delete all packages",
+                                              command = self.clearPackages)
         self.buttons.controls['left'] = [self.addIcon]
-        self.buttons.controls['right'] = [self.autoPackageButton]
+        self.buttons.controls['right'] = [self.deleteIcon, self.autoPackageButton]
         self.buttons.updateLayout(0, 2)
 
         cmds.formLayout(self, edit = True,
@@ -620,6 +629,33 @@ class packManagerUI:
         if (packEditorPane):
             packEditorPane.updateItemsList()
 
+    # deleteIcon button command
+    def clearPackages(self, warning = True):
+        '''
+        Clears the list of packages.
+        \nNote that there must always be at least one package, so this immediately creates a new one if the list is empty.
+        '''
+
+        if (len(self.packageList.controls) <= 1
+            and len(currentPackage.items) <= 0
+            and currentPackage.getFileName() == ""):
+            return
+
+        if (warning):
+            response = cmds.confirmDialog(title = 'Are you sure?', button = ['Yes','Cancel'],
+                                          defaultButton = 'Yes',    cancelButton = 'Cancel',
+                                          icon = 'information',    dismissString = 'Cancel', message = "" \
+            "Are you sure you want to delete all packages in the list?\n\nThis cannot be undone.")
+
+            if (response == 'Cancel'):
+                return
+
+        for package in self.packageList.controls['top']:
+            cmds.deleteUI(package, layout = True)
+        
+        self.packageList.controls['top'] = []
+        self.setCurrentPackage(self.addPackage())
+
     # package.deleteIcon button command
     def removePackage(self, pack):
         '''
@@ -627,10 +663,6 @@ class packManagerUI:
         \nNote that there must always be at least one package, so this immediately creates a new one if the list is empty.
         '''
         self.packageList.controls['top'].remove(pack)
-
-        # fix packages lingering even when they're not in the list
-        if (cmds.formLayout(pack, exists = True) and len(pack.items) > 0):
-            cmds.deleteUI(pack)
         
         # select a new currentPackage so packEditor doesn't show information from the package we just deleted
         if (len(self.packageList.controls['top']) <= 0):
@@ -639,6 +671,7 @@ class packManagerUI:
             self.packageList.updateLayout(yOffset = 4)
             self.setCurrentPackage(self.packageList.controls['top'][0])
 
+    # addIcon button command
     def addPackage(self):
         '''
         Adds a new empty package to the list.
